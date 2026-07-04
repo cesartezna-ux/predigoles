@@ -180,7 +180,7 @@ async function sSet(k,v,sh){
   const r=await cloudCall({action:"set",key:k,value:v});
   return r&&r.status==="success";
 }
-async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}尊}
+async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}
 async function setJSON(k,o,sh){return sSet(k,JSON.stringify(o),sh);}
 async function fetchAllShared(){
   const r=await cloudCall({action:"getAll"});
