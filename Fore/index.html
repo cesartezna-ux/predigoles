@@ -145,26 +145,32 @@ const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"kv
 localStorage.setItem("pg_tab",TAB);
 
 const RAW=[
-["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia"],
-["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos"],
-["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega"],
-["o4","Octavos","2026-07-05T19:00:00-05:00","México","Inglaterra"],
-["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España"],
-["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica"],
-["o7","Octavos","2026-07-07T11:00:00-05:00","Por definir (Arg./Cabo Verde)","Egipto"],
-["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Por definir (Col./Ghana)"],
-["q1","Cuartos","2026-07-09T15:00:00-05:00","Ganador O1","Ganador O2"],
-["q2","Cuartos","2026-07-10T14:00:00-05:00","Ganador O5","Ganador O6"],
-["q3","Cuartos","2026-07-11T16:00:00-05:00","Ganador O3","Ganador O4"],
-["q4","Cuartos","2026-07-11T20:00:00-05:00","Ganador O7","Ganador O8"],
-["s1","Semifinal","2026-07-14T14:00:00-05:00","Ganador C1","Ganador C2"],
-["s2","Semifinal","2026-07-15T14:00:00-05:00","Ganador C3","Ganador C4"],
-["tp","Tercer puesto","2026-07-18T16:00:00-05:00","Perdedor S1","Perdedor S2"],
-["fn","Final","2026-07-19T14:00:00-05:00","Ganador S1","Ganador S2"],
+["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia","MetLife Stadium, NY/NJ"],
+["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos","Hard Rock Stadium, Miami"],
+["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega","SoFi Stadium, Los Angeles"],
+["o4","Octavos","2026-07-05T19:00:00-05:00","México","Inglaterra","Estadio Azteca, CDMX"],
+["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España","AT&T Stadium, Dallas"],
+["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica","Mercedes-Benz Stadium, Atlanta"],
+["o7","Octavos","2026-07-07T11:00:00-05:00","Por definir (Arg./Cabo Verde)","Egipto","BC Place, Vancouver"],
+["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Por definir (Col./Ghana)","Lumen Field, Seattle"],
+["q1","Cuartos","2026-07-09T15:00:00-05:00","Ganador O1","Ganador O2","Gillette Stadium, Boston"],
+["q2","Cuartos","2026-07-10T14:00:00-05:00","Ganador O5","Ganador O6","Arrowhead Stadium, Kansas City"],
+["q3","Cuartos","2026-07-11T16:00:00-05:00","Ganador O3","Ganador O4","NRG Stadium, Houston"],
+["q4","Cuartos","2026-07-11T20:00:00-05:00","Ganador O7","Ganador O8","Levi's Stadium, San Francisco"],
+["s1","Semifinal","2026-07-14T14:00:00-05:00","Ganador C1","Ganador C2","AT&T Stadium, Dallas"],
+["s2","Semifinal","2026-07-15T14:00:00-05:00","Ganador C3","Ganador C4","Mercedes-Benz Stadium, Atlanta"],
+["tp","Tercer puesto","2026-07-18T16:00:00-05:00","Perdedor S1","Perdedor S2","Hard Rock Stadium, Miami"],
+["fn","Final","2026-07-19T14:00:00-05:00","Ganador S1","Ganador S2","MetLife Stadium, NY/NJ"],
 ];
-const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),custom:false}));
+const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),venue:r[5]||"Estadio de la Fase",custom:false}));
 const FLAG={"México":"🇲🇽","Sudáfrica":"🇿🇦","Corea del Sur":"🇰🇷","Chequia":"🇨🇿","Canadá":"🇨🇦","Bosnia y Herzegovina":"🇧🇦","Estados Unidos":"🇺🇸","Paraguay":"🇵🇾","Catar":"🇶🇦","Suiza":"🇨🇭","Brasil":"🇧🇷","Marruecos":"🇲🇦","Haití":"🇭🇹","Escocia":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Australia":"🇦🇺","Turquía":"🇹🇷","Alemania":"🇩🇪","Curazao":"🇨🇼","Países Bajos":"🇳🇱","Japón":"🇯🇵","Costa de Marfil":"🇨🇮","Ecuador":"🇪🇨","Suecia":"🇸🇪","Túnez":"🇹🇳","España":"🇪🇸","Cabo Verde":"🇨🇻","Bélgica":"🇧🇪","Egipto":"🇪🇬","Arabia Saudita":"🇸🇦","Uruguay":"🇺🇾","Irán":"🇮🇷","Nueva Zelanda":"🇳🇿","Francia":"🇫🇷","Senegal":"🇸🇳","Irak":"🇮🇶","Noruega":"🇳🇴","Argentina":"🇦🇷","Argelia":"🇩🇿","Austria":"🇦🇹","Jordania":"🇯🇴","Portugal":"🇵🇹","RD Congo":"🇨🇩","Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia":"🇭🇷","Ghana":"🇬🇭","Panamá":"🇵🇦","Uzbekistán":"🇺🇿","Colombia":"🇨🇴"};
 const flag=n=>FLAG[n]||"⚽";
+
+const ALLOWED_TEAMS=Object.keys(FLAG).concat([
+  "Ganador O1","Ganador O2","Ganador O3","Ganador O4","Ganador O5","Ganador O6","Ganador O7","Ganador O8",
+  "Ganador C1","Ganador C2","Ganador C3","Ganador C4","Ganador S1","Ganador S2","Perdedor S1","Perdedor S2",
+  "Por definir (Arg./Cabo Verde)","Por definir (Col./Ghana)"
+]);
 
 /* --- Storage --- */
 const CACHE={};
@@ -194,7 +200,7 @@ const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","
 let pendingIco=AVATARS[0];
 
 function allMatches(){
-  const cm=S.custom.map(c=>({id:c.id,g:c.g||"ELIM",home:c.home,away:c.away,kick:c.kick,custom:true}));
+  const cm=S.custom.map(c=>({id:c.id,g:c.g||"ELIM",home:c.home,away:c.away,kick:c.kick,venue:c.venue||"Estadio Asignado",custom:true}));
   const all=FIXTURE.map(m=>({...m})).concat(cm);
   for(const m of all){
     const ov=S.teamOverrides[m.id];
@@ -320,6 +326,7 @@ function matchCardHtml(m){
       <span class="grp ${colo?"colrib":""}">${colo?"¡Juega Colombia! 🇨🇴":m.g}</span>
       <span class="when">${whenHtml(m.kick)}<span class="cd" id="cd_${m.id}"></span></span>
     </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:4px;">📍 ${escapeHtml(m.venue)}</div>
     <div class="cols"><span class="sp"></span><span class="colh">Pron.</span><span class="colh">Real</span></div>
     <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm ${homeWin?"win":""}">${escapeHtml(m.home)}</span>${predBox("h",ph)}<div class="box real">${rh}</div></div>
     <div class="divider"></div>
@@ -513,10 +520,13 @@ async function showGroupEdit(){
 }
 
 async function editTeamName(id,side,current){
-  const val=prompt(`Nuevo nombre (equipo ${side==="home"?"local":"visitante"}):`,current);
+  const val=prompt(`Nuevo nombre oficial para equipo ${side==="home"?"local":"visitante"}:`,current);
   if(val===null)return;
   const name=val.trim();
-  if(!name){toast("El nombre no puede quedar vacío.",true);return;}
+  if(!ALLOWED_TEAMS.includes(name)){
+    alert(`❌ Error: "${name}" no es un nombre de equipo permitido en el torneo. Revisa la ortografía y las mayúsculas.`);
+    return;
+  }
   S.teamOverrides[id]=S.teamOverrides[id]||{};
   S.teamOverrides[id][side]=name;
   await setJSON("teamOverrides",S.teamOverrides,true);
@@ -528,16 +538,23 @@ async function editTeamName(id,side,current){
 function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
   const ms=allMatches().slice().sort((a,b)=>b.kick-a.kick);
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Carga el <b>resultado oficial</b> o agrega nuevos cruces.</div>`;
+  
+  let datalistOptions=ALLOWED_TEAMS.map(team=>`<option value="${team}"></option>`).join("");
+
+  let html=`<datalist id="teams_list">${datalistOptions}</datalist>
+  <div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Carga el <b>resultado oficial</b> o agrega nuevos cruces.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Sincronizar Resultados FIFA en Vivo</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
+  
   html+=`<div class="addbox"><div class="ttl">➕ Agregar partido eliminatorio</div><div class="addgrid">
-    <input class="mini" id="cm_home" placeholder="Equipo local">
-    <input class="mini" id="cm_away" placeholder="Equipo visitante">
+    <input class="mini" id="cm_home" list="teams_list" placeholder="Equipo local">
+    <input class="mini" id="cm_away" list="teams_list" placeholder="Equipo visitante">
     <input class="mini" id="cm_date" type="date" value="${new Date().toISOString().slice(0,10)}">
     <input class="mini" id="cm_time" type="time" value="14:00">
+    <input class="mini full" id="cm_venue" placeholder="📍 Sede / Estadio (Ej: Estadio Azteca)">
     <input class="mini full" id="cm_fase" placeholder="Fase (ej: Cuartos, Semis, Final)">
+    <div id="cm_err" style="color:var(--flare);font-size:12px;grid-column:1/3;text-align:center;display:none;font-weight:600;"></div>
     <button class="smallbtn full" id="cm_add">Agregar partido</button>
   </div></div>`;
   for(const m of ms){
@@ -545,6 +562,7 @@ function renderResultados(c){
     html+=`<div class="match" style="border-radius:14px">
       <div class="mtop"><span class="grp">🏆 ${m.g}</span>
       <span class="when">${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}</div>
       <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button><input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}"></div>
       <div class="divider"></div>
       <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span><button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button><input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}"></div>
@@ -552,6 +570,35 @@ function renderResultados(c){
   }
   c.innerHTML=html;
   document.getElementById("cm_add").onclick=addCustomMatch;
+
+  const validateAdminInputs=()=>{
+    const h=document.getElementById("cm_home").value.trim();
+    const a=document.getElementById("cm_away").value.trim();
+    const errDiv=document.getElementById("cm_err");
+    const btnAdd=document.getElementById("cm_add");
+
+    if(h && !ALLOWED_TEAMS.includes(h)){
+      errDiv.textContent=`⚠️ "${h}" no existe. Revisa la lista o la ortografía.`;
+      errDiv.style.display="block";
+      btnAdd.disabled=true;
+      btnAdd.style.opacity="0.3";
+      return;
+    }
+    if(a && !ALLOWED_TEAMS.includes(a)){
+      errDiv.textContent=`⚠️ "${a}" no existe. Revisa la lista o la ortografía.`;
+      errDiv.style.display="block";
+      btnAdd.disabled=true;
+      btnAdd.style.opacity="0.3";
+      return;
+    }
+    errDiv.style.display="none";
+    btnAdd.disabled=false;
+    btnAdd.style.opacity="1";
+  };
+
+  document.getElementById("cm_home").oninput=validateAdminInputs;
+  document.getElementById("cm_away").oninput=validateAdminInputs;
+
   c.querySelectorAll(".editnm").forEach(b=>{
     b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
   });
@@ -581,12 +628,20 @@ async function addCustomMatch(){
   const home=document.getElementById("cm_home").value.trim();
   const away=document.getElementById("cm_away").value.trim();
   const d=document.getElementById("cm_date").value,t=document.getElementById("cm_time").value;
+  const venue=document.getElementById("cm_venue").value.trim()||"Estadio Mundialista";
   const fase=document.getElementById("cm_fase").value.trim()||"Eliminatoria";
+  
   if(!home||!away||!d||!t){toast("Completa equipos, fecha y hora.",true);return;}
+  
+  if(!ALLOWED_TEAMS.includes(home)||!ALLOWED_TEAMS.includes(away)){
+    toast("❌ No se puede guardar: Nombre de equipo inválido.",true);
+    return;
+  }
+
   const kick=new Date(`${d}T${t}:00-05:00`).getTime();
   if(isNaN(kick)){toast("Fecha u hora inválida.",true);return;}
   const id="c_"+Math.random().toString(36).slice(2,8);
-  S.custom.push({id,g:fase,home,away,kick});
+  S.custom.push({id,g:fase,home,away,kick,venue});
   await setJSON("custom",S.custom,true);
   toast("Partido agregado ✓");
   renderResultados(document.getElementById("content"));
