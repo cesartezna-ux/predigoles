@@ -130,6 +130,9 @@
   .mystats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .mystats .sb{background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
   .mystats .sb b{color:var(--gold);font-family:var(--score);font-size:16px}
+  /* Estilo personalizado para el combo desplegable del popup */
+  .select-popup { width:100%; background:#06120d; border:1px solid var(--faint); border-radius:12px; color:var(--line); font:600 15px var(--body); padding:13px; outline:none; margin-bottom:15px; }
+  .select-popup:focus { border-color:var(--mint); }
 </style>
 
 <div class="wrap" id="root"></div>
@@ -145,14 +148,14 @@ const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"kv
 localStorage.setItem("pg_tab",TAB);
 
 const RAW=[
-["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia","MetLife Stadium, NY/NJ"],
-["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos","Hard Rock Stadium, Miami"],
-["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega","SoFi Stadium, Los Angeles"],
+["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia","Estadio Filadelfia, Filadelfia"],
+["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos","Houston"],
+["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega","Estadio NY, NJ, East Rutherford"],
 ["o4","Octavos","2026-07-05T19:00:00-05:00","México","Inglaterra","Estadio Azteca, CDMX"],
-["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España","AT&T Stadium, Dallas"],
-["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica","Mercedes-Benz Stadium, Atlanta"],
-["o7","Octavos","2026-07-07T11:00:00-05:00","Por definir (Arg./Cabo Verde)","Egipto","BC Place, Vancouver"],
-["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Por definir (Col./Ghana)","Lumen Field, Seattle"],
+["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España","Estadio Dallas, Arlington"],
+["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica","Estadio Seattle, Seattle"],
+["o7","Octavos","2026-07-07T11:00:00-05:00","Argentina","Egipto","Mercedes-Benz Stadium, Atlanta"],
+["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Colombia","Estadio BC Place, Vancouver"],
 ["q1","Cuartos","2026-07-09T15:00:00-05:00","Ganador O1","Ganador O2","Gillette Stadium, Boston"],
 ["q2","Cuartos","2026-07-10T14:00:00-05:00","Ganador O5","Ganador O6","Arrowhead Stadium, Kansas City"],
 ["q3","Cuartos","2026-07-11T16:00:00-05:00","Ganador O3","Ganador O4","NRG Stadium, Houston"],
@@ -170,7 +173,7 @@ const ALLOWED_TEAMS=Object.keys(FLAG).concat([
   "Ganador O1","Ganador O2","Ganador O3","Ganador O4","Ganador O5","Ganador O6","Ganador O7","Ganador O8",
   "Ganador C1","Ganador C2","Ganador C3","Ganador C4","Ganador S1","Ganador S2","Perdedor S1","Perdedor S2",
   "Por definir (Arg./Cabo Verde)","Por definir (Col./Ghana)"
-]);
+]).sort();
 
 /* --- Storage --- */
 const CACHE={};
@@ -519,44 +522,46 @@ async function showGroupEdit(){
   };
 }
 
-async function editTeamName(id,side,current){
-  const val=prompt(`Nuevo nombre oficial para equipo ${side==="home"?"local":"visitante"}:`,current);
-  if(val===null)return;
-  const name=val.trim();
-  if(!ALLOWED_TEAMS.includes(name)){
-    alert(`❌ Error: "${name}" no es un nombre de equipo permitido en el torneo. Revisa la ortografía y las mayúsculas.`);
-    return;
-  }
-  S.teamOverrides[id]=S.teamOverrides[id]||{};
-  S.teamOverrides[id][side]=name;
-  await setJSON("teamOverrides",S.teamOverrides,true);
-  toast("Nombre actualizado ✓",false,2500);
-  renderResultados(document.getElementById("content"));
+/* --- Pop-up Flotante Pro con Lista Desplegable (<select>) --- */
+function editTeamName(id,side,current){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  
+  let optionsHtml=ALLOWED_TEAMS.map(team=>`<option value="${team}" ${team===current?"selected":""}>${team}</option>`).join("");
+  
+  ov.innerHTML=`<div class="card">
+    <div class="kicker" style="color:var(--gold)">Asignación de Clasificados</div>
+    <h2>Definir Equipo</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Selecciona la selección oficial que ocupará este lugar:</p>
+    <label class="field">Equipo ${side==="home"?"Local":"Visitante"}</label>
+    <select class="select-popup" id="popup_select_team">${optionsHtml}</select>
+    <button class="btn" id="popup_save_team">Confirmar Cambio</button>
+    <button class="btn ghost" id="popup_cancel_team" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  
+  document.getElementById("popup_cancel_team").onclick=()=>ov.remove();
+  document.getElementById("popup_save_team").onclick=async()=>{
+    const name=document.getElementById("popup_select_team").value;
+    S.teamOverrides[id]=S.teamOverrides[id]||{};
+    S.teamOverrides[id][side]=name;
+    await setJSON("teamOverrides",S.teamOverrides,true);
+    ov.remove();
+    toast("Nombre oficial actualizado ✓",false,2500);
+    renderResultados(document.getElementById("content"));
+  };
 }
 
-/* --- Resultados (organizer) --- */
+/* --- Panel de Resultados Simplificado (Sin Formulario de Carga Manual) --- */
 function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
   const ms=allMatches().slice().sort((a,b)=>b.kick-a.kick);
   
-  let datalistOptions=ALLOWED_TEAMS.map(team=>`<option value="${team}"></option>`).join("");
-
-  let html=`<datalist id="teams_list">${datalistOptions}</datalist>
-  <div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Carga el <b>resultado oficial</b> o agrega nuevos cruces.</div>`;
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Configura los cruces de las fases finales usando el botón ✏️ o gestiona el grupo.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Sincronizar Resultados FIFA en Vivo</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
   
-  html+=`<div class="addbox"><div class="ttl">➕ Agregar partido eliminatorio</div><div class="addgrid">
-    <input class="mini" id="cm_home" list="teams_list" placeholder="Equipo local">
-    <input class="mini" id="cm_away" list="teams_list" placeholder="Equipo visitante">
-    <input class="mini" id="cm_date" type="date" value="${new Date().toISOString().slice(0,10)}">
-    <input class="mini" id="cm_time" type="time" value="14:00">
-    <input class="mini full" id="cm_venue" placeholder="📍 Sede / Estadio (Ej: Estadio Azteca)">
-    <input class="mini full" id="cm_fase" placeholder="Fase (ej: Cuartos, Semis, Final)">
-    <div id="cm_err" style="color:var(--flare);font-size:12px;grid-column:1/3;text-align:center;display:none;font-weight:600;"></div>
-    <button class="smallbtn full" id="cm_add">Agregar partido</button>
-  </div></div>`;
   for(const m of ms){
     const r=S.resWork[m.id]||{},locked=S.now>=m.kick;
     html+=`<div class="match" style="border-radius:14px">
@@ -569,35 +574,6 @@ function renderResultados(c){
     </div>`;
   }
   c.innerHTML=html;
-  document.getElementById("cm_add").onclick=addCustomMatch;
-
-  const validateAdminInputs=()=>{
-    const h=document.getElementById("cm_home").value.trim();
-    const a=document.getElementById("cm_away").value.trim();
-    const errDiv=document.getElementById("cm_err");
-    const btnAdd=document.getElementById("cm_add");
-
-    if(h && !ALLOWED_TEAMS.includes(h)){
-      errDiv.textContent=`⚠️ "${h}" no existe. Revisa la lista o la ortografía.`;
-      errDiv.style.display="block";
-      btnAdd.disabled=true;
-      btnAdd.style.opacity="0.3";
-      return;
-    }
-    if(a && !ALLOWED_TEAMS.includes(a)){
-      errDiv.textContent=`⚠️ "${a}" no existe. Revisa la lista o la ortografía.`;
-      errDiv.style.display="block";
-      btnAdd.disabled=true;
-      btnAdd.style.opacity="0.3";
-      return;
-    }
-    errDiv.style.display="none";
-    btnAdd.disabled=false;
-    btnAdd.style.opacity="1";
-  };
-
-  document.getElementById("cm_home").oninput=validateAdminInputs;
-  document.getElementById("cm_away").oninput=validateAdminInputs;
 
   c.querySelectorAll(".editnm").forEach(b=>{
     b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
@@ -624,28 +600,6 @@ async function saveResultsBatch(){
   toast(ok?"Resultados guardados ✓":"Error al guardar",!ok);
   if(S.view==="ranking")renderRanking(document.getElementById("content"));
 }
-async function addCustomMatch(){
-  const home=document.getElementById("cm_home").value.trim();
-  const away=document.getElementById("cm_away").value.trim();
-  const d=document.getElementById("cm_date").value,t=document.getElementById("cm_time").value;
-  const venue=document.getElementById("cm_venue").value.trim()||"Estadio Mundialista";
-  const fase=document.getElementById("cm_fase").value.trim()||"Eliminatoria";
-  
-  if(!home||!away||!d||!t){toast("Completa equipos, fecha y hora.",true);return;}
-  
-  if(!ALLOWED_TEAMS.includes(home)||!ALLOWED_TEAMS.includes(away)){
-    toast("❌ No se puede guardar: Nombre de equipo inválido.",true);
-    return;
-  }
-
-  const kick=new Date(`${d}T${t}:00-05:00`).getTime();
-  if(isNaN(kick)){toast("Fecha u hora inválida.",true);return;}
-  const id="c_"+Math.random().toString(36).slice(2,8);
-  S.custom.push({id,g:fase,home,away,kick,venue});
-  await setJSON("custom",S.custom,true);
-  toast("Partido agregado ✓");
-  renderResultados(document.getElementById("content"));
-}
 
 /* --- Configuración inicial del grupo (pantalla verde obligatoria en momento cero) --- */
 function showGroupSetup(onDone){
@@ -664,7 +618,7 @@ function showGroupSetup(onDone){
     <label class="field" style="margin-top:10px">Confirma el PIN</label>
     <input class="input" id="ap2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
     <div id="gs_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
-    <button class="btn" id="gs_save" style="margin-top:16px">Crear grupo</button>
+    <button class="btn" id="gs_save" style="margin-top:16px">Crar grupo</button>
   </div>`;
   document.getElementById("gs_save").onclick=async()=>{
     const name=document.getElementById("gn_in").value.trim();
