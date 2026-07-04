@@ -137,28 +137,22 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KSrvVowdHXk7bi5ldBeqcR0_ELzhhhwBsnLOhUTkUlgZkct/exec"; // ⚠️ Reemplaza con la URL de TU despliegue de Apps Script (Sheet nuevo y separado de Familia Tezna)
+const SCRIPT_URL="PEGA_AQUÍ_LA_URL_DE_TU_APPS_SCRIPT";
 
-/* --- Multi-tenant: cada cliente vendido = una pestaña distinta de la misma hoja (kv1, kv2, kv3...) ---
-   Se define con ?tab=kv3 en el link que le compartes a cada cliente.
-   Ej: https://predigoles.com/?tab=kv3
-   Si no viene en la URL, usa el último que se usó en este dispositivo (localStorage), y si tampoco existe, "kv1" por defecto. */
+/* --- Multi-tenant inteligente con soporte para ?grupo= o el viejo ?tab= --- */
 const _qp=new URLSearchParams(location.search);
-const TAB=(_qp.get("tab")||localStorage.getItem("pg_tab")||"kv1").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"kv1";
+const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"kv1").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"kv1";
 localStorage.setItem("pg_tab",TAB);
 
 const RAW=[
-// Confirmados (fecha/hora en referencia Colombia -05:00, cruzadas entre varias fuentes el 3-jul-2026):
 ["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia"],
 ["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos"],
 ["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega"],
 ["o4","Octavos","2026-07-05T19:00:00-05:00","México","Inglaterra"],
 ["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España"],
 ["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica"],
-// Pendientes: se definen hoy viernes 3 de julio (Argentina vs Cabo Verde, y Colombia vs Ghana)
 ["o7","Octavos","2026-07-07T11:00:00-05:00","Por definir (Arg./Cabo Verde)","Egipto"],
 ["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Por definir (Col./Ghana)"],
-// Cuartos, semis, tercer puesto y final — nombres genéricos según llave oficial, se actualizan con "✏️" en el panel de organizador
 ["q1","Cuartos","2026-07-09T15:00:00-05:00","Ganador O1","Ganador O2"],
 ["q2","Cuartos","2026-07-10T14:00:00-05:00","Ganador O5","Ganador O6"],
 ["q3","Cuartos","2026-07-11T16:00:00-05:00","Ganador O3","Ganador O4"],
@@ -186,7 +180,7 @@ async function sSet(k,v,sh){
   const r=await cloudCall({action:"set",key:k,value:v});
   return r&&r.status==="success";
 }
-async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}}
+async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}尊}
 async function setJSON(k,o,sh){return sSet(k,JSON.stringify(o),sh);}
 async function fetchAllShared(){
   const r=await cloudCall({action:"getAll"});
@@ -220,9 +214,7 @@ const COLO=m=>m.home==="Colombia"||m.away==="Colombia";
 const FD=new Intl.DateTimeFormat("es-CO",{weekday:"short",day:"numeric",month:"short"});
 const FT=new Intl.DateTimeFormat("es-CO",{hour:"numeric",minute:"2-digit",hour12:true});
 function dayKey(ts){return FD.format(ts);}
-function whenHtml(kick){
-  return`${cap(FD.format(kick))} · ${FT.format(kick)}`;
-}
+function whenHtml(kick){return`${cap(FD.format(kick))} · ${FT.format(kick)}`;}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function cd(diff){
   if(diff<=0)return null;
@@ -233,7 +225,6 @@ function cd(diff){
   return{t:`${mm}m ${String(s).padStart(2,"0")}s`,soon:true};
 }
 
-/* --- Helpers --- */
 function _hashPin(pin){let h=0;for(let i=0;i<pin.length;i++){h=((h<<5)-h)+pin.charCodeAt(i);h|=0;}return"ph_"+Math.abs(h).toString(36);}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
@@ -267,26 +258,24 @@ function renderShell(){
     <div id="content"></div>`;
   document.getElementById("changeName").onclick=()=>showOnboarding(true);
   document.getElementById("orgBtn").onclick=async()=>{
-  if(S.organizer){
-    // Si ya es organizador, desactivar directo
-    S.organizer=false;
-    await setJSON("organizer",false,false);
-    renderShell();renderView();
-  } else {
-    // Pedir PIN de administrador (configurado por el organizador al crear el grupo)
-    const ingresado=prompt("🔑 PIN de administrador:");
-    if(ingresado===null) return; // canceló
-    const storedHash=await getJSON("adminPin",true);
-    if(storedHash&&_hashPin(ingresado.trim())===storedHash){
-      S.organizer=true;
-      await setJSON("organizer",true,false);
+    if(S.organizer){
+      S.organizer=false;
+      await setJSON("organizer",false,false);
       renderShell();renderView();
-      toast("Modo organizador activado ✓",false,3000);
     } else {
-      toast("PIN incorrecto.",true,3000);
+      const ingresado=prompt("🔑 PIN de administrador:");
+      if(ingresado===null) return;
+      const storedHash=await getJSON("adminPin",true);
+      if(storedHash&&_hashPin(ingresado.trim())===storedHash){
+        S.organizer=true;
+        await setJSON("organizer",true,false);
+        renderShell();renderView();
+        toast("Modo organizador activado ✓",false,3000);
+      } else {
+        toast("PIN incorrecto.",true,3000);
+      }
     }
-  }
-};
+  };
   document.getElementById("tabs").querySelectorAll(".tab").forEach(t=>{t.onclick=()=>{S.view=t.dataset.v;renderView();};});
   const rt=document.querySelector('[data-v="resultados"]');if(rt)rt.style.display=S.organizer?"":"none";
 }
@@ -603,24 +592,24 @@ async function addCustomMatch(){
   renderResultados(document.getElementById("content"));
 }
 
-/* --- Configuración inicial del grupo (solo la primera vez) --- */
+/* --- Configuración inicial del grupo (pantalla verde obligatoria en momento cero) --- */
 function showGroupSetup(onDone){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
-  ov.innerHTML=`<div class="card">
-    <div class="kicker" style="color:var(--mint)">Configuración inicial</div>
+  ov.innerHTML=`<div class="card" style="border-color:var(--mint);box-shadow:0 0 30px rgba(54,224,191,.15)">
+    <div class="kicker" style="color:var(--mint)">Configuración Inicial</div>
     <h2>Crea tu polla</h2>
     <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Eres la primera persona en abrir este link. Configura tu grupo antes de invitar a los demás — esto solo se pide una vez.</p>
     <label class="field">Nombre de tu grupo/polla</label>
-    <input class="input" id="gn_in" maxlength="30" placeholder="Ej: Familia Pérez, Amigos del Fútbol...">
-    <label class="field" style="margin-top:10px">PIN de administrador (4 dígitos)</label>
+    <input class="input" id="gn_in" maxlength="30" placeholder="Ej: Oficina AFFI, Amigos del Fútbol...">
+    <label class="field" style="margin-top:14px">PIN de administrador (4 dígitos)</label>
     <p style="color:var(--muted);font-size:12px;margin:0 0 6px">Lo usarás para entrar al panel de organizador y cargar resultados. Guárdalo bien.</p>
     <input class="input" id="ap1_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
     <label class="field" style="margin-top:10px">Confirma el PIN</label>
     <input class="input" id="ap2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
     <div id="gs_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
-    <button class="btn" id="gs_save" style="margin-top:14px">Crear grupo</button>
+    <button class="btn" id="gs_save" style="margin-top:16px">Crear grupo</button>
   </div>`;
   document.getElementById("gs_save").onclick=async()=>{
     const name=document.getElementById("gn_in").value.trim();
@@ -782,7 +771,6 @@ async function showOnboarding(isChange){
 
 async function joinRoster(){
   await cloudCall({action:"joinRoster", player:S.me});
-  // Recargar el roster actualizado desde la nube
   const fresh = await getJSON("roster", true);
   if(fresh) S.roster = fresh;
   else if(!S.roster.some(p=>p.id===S.me.id)) S.roster.push(S.me);
@@ -888,10 +876,17 @@ window.addEventListener("focus",refreshShared);
     for(const pl of S.roster)S.allPreds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
     if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
     await refreshShared();
+    
+    // Si no hay un nombre de grupo creado en esta pestaña (Momento Cero), forzar configuración verde
     if(!S.groupName){
-      showGroupSetup(()=>{renderShell();renderView();if(!S.me)showOnboarding(false);});
+      showGroupSetup(()=>{
+        renderShell();
+        renderView();
+        if(!S.me)showOnboarding(false);
+      });
       return;
     }
+    
     renderShell();renderView();
     if(!S.me)showOnboarding(false);
   }catch(e){console.error("Boot error:",e);renderShell();renderView();}
