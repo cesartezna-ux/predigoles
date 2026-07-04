@@ -1,0 +1,905 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Predigoles · Edición Eliminatorias Mundial 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pitch:#0a1c15; --panel:#0f2a20; --panel2:#123524; --raise:#16402e;
+    --line:#eaf3ec; --muted:#83a294; --faint:rgba(234,243,236,.10);
+    --gold:#ffc845; --gold2:#d99a1f; --flare:#ff4d6d; --mint:#36e0bf;
+    --display:'Anton',sans-serif; --score:'Teko',sans-serif; --body:'Inter',system-ui,sans-serif;
+    --r:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:var(--body);color:var(--line);background:var(--pitch);
+    background-image:radial-gradient(120% 60% at 50% -10%,rgba(54,224,191,.08),transparent 60%),
+    repeating-linear-gradient(180deg,transparent 0 46px,rgba(255,255,255,.012) 46px 92px);
+    -webkit-font-smoothing:antialiased;min-height:100vh}
+  .wrap{max-width:640px;margin:0 auto;padding:0 14px 120px}
+  a{color:var(--mint)}
+  header{padding:22px 2px 12px;position:relative}
+  .topfijo{position:sticky;top:0;z-index:30;background:var(--pitch);padding-bottom:4px}
+  .kicker{font:600 11px/1 var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--mint)}
+  h1{font-family:var(--display);font-weight:400;margin:6px 0 2px;font-size:clamp(34px,9vw,52px);line-height:.92;letter-spacing:.5px;text-transform:uppercase}
+  h1 .yr{color:var(--gold);-webkit-text-stroke:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .whoami{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:7px 12px;font-size:13px}
+  .chip b{font-weight:700}
+  .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint)}
+  .link-btn{background:none;border:none;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:4px}
+  .keybtn{margin-left:auto;background:var(--panel);border:1px solid var(--faint);color:var(--muted);border-radius:10px;padding:7px 10px;font-size:13px;cursor:pointer}
+  .keybtn.on{color:var(--pitch);background:var(--gold);border-color:var(--gold);font-weight:700}
+  .tabs{display:flex;gap:6px;position:static;z-index:20;padding:10px 0;background:var(--pitch)}
+  .tab{flex:1;text-align:center;padding:11px 8px;border-radius:12px;cursor:pointer;background:var(--panel);border:1px solid var(--faint);color:var(--muted);font-weight:600;font-size:13.5px;letter-spacing:.02em}
+  .tab.active{background:var(--raise);color:var(--line);border-color:rgba(255,200,69,.4)}
+  .datesel{display:flex;align-items:center;gap:8px;margin:16px 0 4px}
+  .datechips{display:flex;gap:8px;overflow-x:auto;flex:1;padding:2px 1px;scrollbar-width:none;-ms-overflow-style:none}
+  .datechips::-webkit-scrollbar{display:none}
+  .datechip{flex:none;padding:9px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--faint);color:var(--muted);font-weight:700;font-size:12.5px;white-space:nowrap;cursor:pointer;letter-spacing:.02em}
+  .datechip.active{background:var(--raise);color:var(--line);border-color:rgba(255,200,69,.5)}
+  .datechip.hoy{color:var(--gold)}
+  .dayarrow{flex:none;width:34px;height:34px;border-radius:10px;background:var(--panel);border:1px solid var(--faint);color:var(--line);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .dayarrow:disabled{opacity:.28;cursor:default}
+  .daygroup{margin-top:18px}
+  .dayhead{display:flex;align-items:center;gap:12px;margin:6px 2px 12px}
+  .dayhead .d{font-family:var(--display);font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--line);white-space:nowrap}
+  .dayhead .rule{height:1px;background:linear-gradient(90deg,var(--gold2),transparent);flex:1}
+  .match{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--faint);border-radius:var(--r);padding:12px 12px 11px;margin-bottom:11px;position:relative;overflow:hidden}
+  .match.col{border-color:rgba(255,200,69,.5);box-shadow:0 0 0 1px rgba(255,200,69,.15)}
+  .mtop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+  .grp{font:700 10px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);background:var(--raise);border-radius:6px;padding:5px 7px}
+  .grp.colrib{color:var(--pitch);background:var(--gold);font-weight:700}
+  .when{font-size:11.5px;color:var(--muted);text-align:right;line-height:1.25}
+  .when .cd{display:block;font-family:var(--score);font-size:15px;letter-spacing:.03em;color:var(--mint);font-weight:600}
+  .when .cd.soon{color:var(--flare)}
+  .when .cd.closed{color:var(--muted)}
+  .team{display:flex;align-items:center;gap:10px;padding:6px 0}
+  .editnm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;flex:none;opacity:.7}
+  .editnm:hover{opacity:1}
+  .team .fl{font-size:22px;width:26px;text-align:center;flex:none;filter:saturate(1.1)}
+  .team .nm{font-weight:600;font-size:15px;flex:1;min-width:0}
+  .team .nm.win{color:var(--gold)}
+  .box{font-family:var(--score);font-weight:600;width:46px;height:46px;flex:none;text-align:center;font-size:26px;color:var(--gold);background:#06120d;border:1px solid rgba(255,200,69,.25);border-radius:10px;line-height:46px;padding:0;box-shadow:inset 0 0 12px rgba(0,0,0,.6)}
+  input.box{outline:none;-moz-appearance:textfield}
+  input.box::-webkit-outer-spin-button,input.box::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input.box:focus{border-color:var(--mint);box-shadow:inset 0 0 12px rgba(0,0,0,.6),0 0 0 2px rgba(54,224,191,.35)}
+  input.box:disabled{color:var(--muted);border-color:var(--faint);opacity:.85}
+  .divider{height:1px;background:var(--faint);margin:3px 0}
+  .mfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;min-height:20px}
+  .status{font-size:12px;color:var(--muted)}
+  .status.locked{color:var(--flare);font-weight:600}
+  .pts{font-family:var(--score);font-weight:700;font-size:17px;padding:2px 9px;border-radius:8px;letter-spacing:.02em}
+  .pts.p3{background:var(--gold);color:var(--pitch)}
+  .pts.p1{background:rgba(54,224,191,.18);color:var(--mint)}
+  .pts.p0{background:var(--raise);color:var(--muted)}
+  .savebar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;background:linear-gradient(180deg,transparent,rgba(7,18,13,.96) 30%);padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
+  .savebar .inner{max-width:640px;margin:0 auto}
+  .btn{display:block;width:100%;border:none;cursor:pointer;border-radius:14px;padding:15px;font:700 16px var(--body);letter-spacing:.02em;background:var(--gold);color:#231600;box-shadow:0 8px 26px rgba(255,200,69,.28)}
+  .btn:active{transform:translateY(1px)}
+  .btn.ghost{background:var(--panel);color:var(--line);border:1px solid var(--faint);box-shadow:none}
+  .lead{margin-top:8px}
+  .leadhead{display:flex;justify-content:space-between;align-items:baseline;margin:4px 2px 14px}
+  .leadhead .t{font-family:var(--display);font-size:20px;text-transform:uppercase;letter-spacing:.06em}
+  .leadhead .meta{font-size:12px;color:var(--muted)}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--faint);margin-bottom:9px}
+  .row.me{border-color:rgba(54,224,191,.5)}
+  .row .rank{font-family:var(--score);font-size:24px;font-weight:700;width:30px;text-align:center;color:var(--muted)}
+  .row.top1 .rank{color:var(--gold)}.row.top2 .rank{color:#cfd8d2}.row.top3 .rank{color:#e6a86b}
+  .row.top1{background:linear-gradient(180deg,rgba(255,200,69,.16),var(--panel));border-color:rgba(255,200,69,.45)}
+  .row .who{flex:1;min-width:0}
+  .row .who .nm{font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px}
+  .row .who .nm .ico{font-size:16px}
+  .row .who .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .row .score{text-align:right}
+  .row .score .pp{font-family:var(--score);font-size:30px;font-weight:700;line-height:1;color:var(--gold)}
+  .row .score .lbl{font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:14px;line-height:1.6}
+  .empty .big{font-size:34px;display:block;margin-bottom:10px}
+  .rules{background:var(--panel);border:1px solid var(--faint);border-radius:14px;padding:14px 16px;margin-top:16px;font-size:13px;color:var(--muted);line-height:1.6}
+  .rules b{color:var(--line)}
+  .rules .pill{display:inline-block;font-family:var(--score);font-weight:700;color:var(--gold);font-size:15px;margin-right:2px}
+  .overlay{position:fixed;inset:0;z-index:100;background:rgba(5,14,10,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{width:100%;max-width:380px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid rgba(255,200,69,.3);border-radius:20px;padding:24px}
+  .card h2{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:26px;margin:4px 0 6px;letter-spacing:.04em}
+  .card p{color:var(--muted);font-size:13px;margin:0 0 18px;line-height:1.55}
+  .field{display:block;font-size:12px;color:var(--muted);margin-bottom:7px;letter-spacing:.04em}
+  .input{width:100%;background:#06120d;border:1px solid var(--faint);border-radius:12px;color:var(--line);font:600 16px var(--body);padding:13px 14px;outline:none}
+  .input:focus{border-color:var(--mint)}
+  .avatars{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 20px}
+  .av{width:42px;height:42px;border-radius:11px;background:#06120d;border:1px solid var(--faint);font-size:21px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .av.sel{border-color:var(--gold);background:var(--raise);box-shadow:0 0 0 2px rgba(255,200,69,.3)}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--mint);color:#06241d;font-weight:700;font-size:14px;padding:11px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:.25s;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.warn{background:var(--flare);color:#fff}
+  .addbox{background:var(--panel);border:1px dashed rgba(255,200,69,.4);border-radius:14px;padding:14px;margin:14px 0}
+  .addbox .ttl{font-weight:700;margin-bottom:10px;font-size:14px}
+  .addgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .addgrid .full{grid-column:1/3}
+  .mini{background:#06120d;border:1px solid var(--faint);border-radius:10px;color:var(--line);font:500 14px var(--body);padding:11px 12px;outline:none;width:100%}
+  .mini:focus{border-color:var(--mint)}
+  .smallbtn{background:var(--gold);color:#231600;border:none;border-radius:10px;padding:11px;font:700 14px var(--body);cursor:pointer;width:100%}
+  .cols{display:flex;align-items:center;gap:10px;margin:2px 0 1px}
+  .cols .sp{flex:1}
+  .cols .colh{width:46px;flex:none;text-align:center;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .box.ro{display:flex;align-items:center;justify-content:center;color:var(--gold);background:#06120d}
+  .box.real{display:flex;align-items:center;justify-content:center;color:var(--mint);border-color:rgba(54,224,191,.35)}
+  .mystats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .mystats .sb{background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
+  .mystats .sb b{color:var(--gold);font-family:var(--score);font-size:16px}
+</style>
+
+<div class="wrap" id="root"></div>
+<div class="savebar" id="savebar"><div class="inner"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KSrvVowdHXk7bi5ldBeqcR0_ELzhhhwBsnLOhUTkUlgZkct/exec"; // ⚠️ Reemplaza con la URL de TU despliegue de Apps Script (Sheet nuevo y separado de Familia Tezna)
+
+/* --- Multi-tenant: cada cliente vendido = una pestaña distinta de la misma hoja (kv1, kv2, kv3...) ---
+   Se define con ?tab=kv3 en el link que le compartes a cada cliente.
+   Ej: https://predigoles.com/?tab=kv3
+   Si no viene en la URL, usa el último que se usó en este dispositivo (localStorage), y si tampoco existe, "kv1" por defecto. */
+const _qp=new URLSearchParams(location.search);
+const TAB=(_qp.get("tab")||localStorage.getItem("pg_tab")||"kv1").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"kv1";
+localStorage.setItem("pg_tab",TAB);
+
+const RAW=[
+// Confirmados (fecha/hora en referencia Colombia -05:00, cruzadas entre varias fuentes el 3-jul-2026):
+["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia"],
+["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos"],
+["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega"],
+["o4","Octavos","2026-07-05T19:00:00-05:00","México","Inglaterra"],
+["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España"],
+["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica"],
+// Pendientes: se definen hoy viernes 3 de julio (Argentina vs Cabo Verde, y Colombia vs Ghana)
+["o7","Octavos","2026-07-07T11:00:00-05:00","Por definir (Arg./Cabo Verde)","Egipto"],
+["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Por definir (Col./Ghana)"],
+// Cuartos, semis, tercer puesto y final — nombres genéricos según llave oficial, se actualizan con "✏️" en el panel de organizador
+["q1","Cuartos","2026-07-09T15:00:00-05:00","Ganador O1","Ganador O2"],
+["q2","Cuartos","2026-07-10T14:00:00-05:00","Ganador O5","Ganador O6"],
+["q3","Cuartos","2026-07-11T16:00:00-05:00","Ganador O3","Ganador O4"],
+["q4","Cuartos","2026-07-11T20:00:00-05:00","Ganador O7","Ganador O8"],
+["s1","Semifinal","2026-07-14T14:00:00-05:00","Ganador C1","Ganador C2"],
+["s2","Semifinal","2026-07-15T14:00:00-05:00","Ganador C3","Ganador C4"],
+["tp","Tercer puesto","2026-07-18T16:00:00-05:00","Perdedor S1","Perdedor S2"],
+["fn","Final","2026-07-19T14:00:00-05:00","Ganador S1","Ganador S2"],
+];
+const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),custom:false}));
+const FLAG={"México":"🇲🇽","Sudáfrica":"🇿🇦","Corea del Sur":"🇰🇷","Chequia":"🇨🇿","Canadá":"🇨🇦","Bosnia y Herzegovina":"🇧🇦","Estados Unidos":"🇺🇸","Paraguay":"🇵🇾","Catar":"🇶🇦","Suiza":"🇨🇭","Brasil":"🇧🇷","Marruecos":"🇲🇦","Haití":"🇭🇹","Escocia":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Australia":"🇦🇺","Turquía":"🇹🇷","Alemania":"🇩🇪","Curazao":"🇨🇼","Países Bajos":"🇳🇱","Japón":"🇯🇵","Costa de Marfil":"🇨🇮","Ecuador":"🇪🇨","Suecia":"🇸🇪","Túnez":"🇹🇳","España":"🇪🇸","Cabo Verde":"🇨🇻","Bélgica":"🇧🇪","Egipto":"🇪🇬","Arabia Saudita":"🇸🇦","Uruguay":"🇺🇾","Irán":"🇮🇷","Nueva Zelanda":"🇳🇿","Francia":"🇫🇷","Senegal":"🇸🇳","Irak":"🇮🇶","Noruega":"🇳🇴","Argentina":"🇦🇷","Argelia":"🇩🇿","Austria":"🇦🇹","Jordania":"🇯🇴","Portugal":"🇵🇹","RD Congo":"🇨🇩","Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia":"🇭🇷","Ghana":"🇬🇭","Panamá":"🇵🇦","Uzbekistán":"🇺🇿","Colombia":"🇨🇴"};
+const flag=n=>FLAG[n]||"⚽";
+
+/* --- Storage --- */
+const CACHE={};
+async function cloudCall(data){
+  if(!SCRIPT_URL||SCRIPT_URL.includes("AQUÍ")) return null;
+  try{const r=await fetch(SCRIPT_URL,{method:"POST",mode:"cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({...data,tab:TAB})});return await r.json();}
+  catch(e){console.error("cloudCall error",e);return null;}
+}
+async function sGet(k,sh){if(!sh)return localStorage.getItem("p:"+k);return CACHE[k]??null;}
+async function sSet(k,v,sh){
+  if(!sh){localStorage.setItem("p:"+k,v);return true;}
+  CACHE[k]=v;
+  const r=await cloudCall({action:"set",key:k,value:v});
+  return r&&r.status==="success";
+}
+async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}}
+async function setJSON(k,o,sh){return sSet(k,JSON.stringify(o),sh);}
+async function fetchAllShared(){
+  const r=await cloudCall({action:"getAll"});
+  if(r){for(const k in r)CACHE[k]=r[k];return true;}
+  return false;
+}
+
+/* --- State --- */
+const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{}};
+const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","🎯","👑","🐺"];
+let pendingIco=AVATARS[0];
+
+function allMatches(){
+  const cm=S.custom.map(c=>({id:c.id,g:c.g||"ELIM",home:c.home,away:c.away,kick:c.kick,custom:true}));
+  const all=FIXTURE.map(m=>({...m})).concat(cm);
+  for(const m of all){
+    const ov=S.teamOverrides[m.id];
+    if(ov){if(ov.home)m.home=ov.home;if(ov.away)m.away=ov.away;}
+  }
+  return all.sort((a,b)=>a.kick-b.kick);
+}
+function outcome(h,a){h=+h;a=+a;if(h>a)return"1";if(h<a)return"2";return"X";}
+function ptsFor(p,r){
+  if(!p||!r||p.h==null||p.a==null||r.h==null||r.a==null)return null;
+  let s=0;
+  if(outcome(p.h,p.a)===outcome(r.h,r.a))s+=1;
+  if(+p.h===+r.h&&+p.a===+r.a)s+=2;
+  return s;
+}
+const COLO=m=>m.home==="Colombia"||m.away==="Colombia";
+const FD=new Intl.DateTimeFormat("es-CO",{weekday:"short",day:"numeric",month:"short"});
+const FT=new Intl.DateTimeFormat("es-CO",{hour:"numeric",minute:"2-digit",hour12:true});
+function dayKey(ts){return FD.format(ts);}
+function whenHtml(kick){
+  return`${cap(FD.format(kick))} · ${FT.format(kick)}`;
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function cd(diff){
+  if(diff<=0)return null;
+  const m=Math.floor(diff/60000),d=Math.floor(m/1440),h=Math.floor((m%1440)/60),mm=m%60;
+  if(d>0)return{t:`${d}d ${h}h`,soon:false};
+  if(h>0)return{t:`${h}h ${mm}m`,soon:h<2};
+  const s=Math.floor((diff%60000)/1000);
+  return{t:`${mm}m ${String(s).padStart(2,"0")}s`,soon:true};
+}
+
+/* --- Helpers --- */
+function _hashPin(pin){let h=0;for(let i=0;i<pin.length;i++){h=((h<<5)-h)+pin.charCodeAt(i);h|=0;}return"ph_"+Math.abs(h).toString(36);}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+const root=document.getElementById("root");
+const elToast=document.getElementById("toast");
+let toastTimer;
+function toast(msg,warn,dur){elToast.textContent=msg;elToast.className="toast show"+(warn?" warn":"");clearTimeout(toastTimer);toastTimer=setTimeout(()=>elToast.className="toast",dur||1900);}
+
+/* --- Shell --- */
+function renderShell(){
+  const me=S.me;
+  root.innerHTML=`
+    <div class="topfijo">
+      <header>
+        <div class="kicker">Predigoles · ${S.groupName?escapeHtml(S.groupName):"Edición Eliminatorias"} · Hora local</div>
+        <h1>Rumbo a la <span class="yr">Final</span></h1>
+        <div class="sub">Acierta el resultado y clava el marcador. Que gane el más mundialista del grupo.</div>
+        <div class="whoami">
+          <span class="chip"><span class="dot"></span> Juegas como <b>${me?escapeHtml(me.ico+" "+me.name):"—"}</b></span>
+          <button class="link-btn" id="changeName">cambiar</button>
+          <button class="keybtn ${S.organizer?"on":""}" id="orgBtn">🔑 Organizador</button>
+        </div>
+        <div class="mystats" id="mystats"></div>
+      </header>
+      <div class="tabs" id="tabs">
+        <div class="tab" data-v="partidos">Partidos</div>
+        <div class="tab" data-v="ranking">Ranking</div>
+        <div class="tab" data-v="resultados" style="display:none">Resultados</div>
+      </div>
+    </div>
+    <div id="content"></div>`;
+  document.getElementById("changeName").onclick=()=>showOnboarding(true);
+  document.getElementById("orgBtn").onclick=async()=>{
+  if(S.organizer){
+    // Si ya es organizador, desactivar directo
+    S.organizer=false;
+    await setJSON("organizer",false,false);
+    renderShell();renderView();
+  } else {
+    // Pedir PIN de administrador (configurado por el organizador al crear el grupo)
+    const ingresado=prompt("🔑 PIN de administrador:");
+    if(ingresado===null) return; // canceló
+    const storedHash=await getJSON("adminPin",true);
+    if(storedHash&&_hashPin(ingresado.trim())===storedHash){
+      S.organizer=true;
+      await setJSON("organizer",true,false);
+      renderShell();renderView();
+      toast("Modo organizador activado ✓",false,3000);
+    } else {
+      toast("PIN incorrecto.",true,3000);
+    }
+  }
+};
+  document.getElementById("tabs").querySelectorAll(".tab").forEach(t=>{t.onclick=()=>{S.view=t.dataset.v;renderView();};});
+  const rt=document.querySelector('[data-v="resultados"]');if(rt)rt.style.display=S.organizer?"":"none";
+}
+
+function paintMyStats(){
+  const el=document.getElementById("mystats");if(!el)return;
+  if(!S.me){el.innerHTML="";return;}
+  const{board}=buildBoard();
+  const idx=board.findIndex(p=>p.id===S.me.id);
+  const pts=idx>=0?board[idx].pts:0;
+  const rank=idx>=0?idx+1:null;
+  const guardados=Object.keys(S.predsMe).length;
+  el.innerHTML=`<span class="sb"><b>${pts}</b> pts totales</span>`+
+    (rank?`<span class="sb">Puesto <b>#${rank}</b> de ${board.length}</span>`:"")+
+    `<span class="sb" style="color:var(--mint)">✓ <b>${guardados}</b> guardados</span>`;
+}
+
+let matchEls={};
+function renderView(){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.v===S.view));
+  const c=document.getElementById("content");
+  matchEls={};
+  if(S.view==="partidos")renderPartidos(c);
+  else if(S.view==="ranking")renderRanking(c);
+  else renderResultados(c);
+  updateSaveBar();tick();paintMyStats();
+}
+
+function matchCardHtml(m){
+  const locked=S.now>=m.kick;
+  const p=S.predsMe[m.id]||{};
+  const res=S.results[m.id];
+  const colo=COLO(m);
+  const ph=(p.h!=null?p.h:""),pa=(p.a!=null?p.a:"");
+  const rh=res?res.h:"–",ra=res?res.a:"–";
+  const homeWin=res&&+res.h>+res.a,awayWin=res&&+res.a>+res.h;
+  const predBox=(side,val)=>locked
+    ?`<div class="box ro">${val!==""?val:"–"}</div>`
+    :`<input class="box" id="${side}_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${val}">`;
+  return`<div class="match ${colo?"col":""}" id="card_${m.id}">
+    <div class="mtop">
+      <span class="grp ${colo?"colrib":""}">${colo?"¡Juega Colombia! 🇨🇴":m.g}</span>
+      <span class="when">${whenHtml(m.kick)}<span class="cd" id="cd_${m.id}"></span></span>
+    </div>
+    <div class="cols"><span class="sp"></span><span class="colh">Pron.</span><span class="colh">Real</span></div>
+    <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm ${homeWin?"win":""}">${escapeHtml(m.home)}</span>${predBox("h",ph)}<div class="box real">${rh}</div></div>
+    <div class="divider"></div>
+    <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm ${awayWin?"win":""}">${escapeHtml(m.away)}</span>${predBox("a",pa)}<div class="box real">${ra}</div></div>
+    <div class="mfoot" id="foot_${m.id}"></div>
+  </div>`;
+}
+
+function buildDayList(){
+  const ms=allMatches();
+  const map=new Map();
+  for(const m of ms){
+    const dk=dayKey(m.kick);
+    if(!map.has(dk))map.set(dk,{key:dk,label:cap(FD.format(m.kick)),matches:[]});
+    map.get(dk).matches.push(m);
+  }
+  return[...map.values()];
+}
+function defaultDay(days){
+  if(S.selectedDay&&days.some(d=>d.key===S.selectedDay))return S.selectedDay;
+  const now=S.now,todayKey=dayKey(now);
+  let d=days.find(d=>d.key===todayKey);
+  if(d)return d.key;
+  d=days.find(d=>d.matches.some(m=>m.kick>now));
+  if(d)return d.key;
+  return days.length?days[days.length-1].key:null;
+}
+
+function renderPartidos(c){
+  const days=buildDayList();
+  if(!days.length){c.innerHTML=`<div class="empty"><span class="big">⚽</span>Aún no hay partidos cargados.</div>`;return;}
+  const activeKey=defaultDay(days);
+  S.selectedDay=activeKey;
+  const activeIdx=days.findIndex(d=>d.key===activeKey);
+  const activeDay=days[activeIdx];
+  const todayKey=dayKey(S.now);
+
+  let chips="";
+  days.forEach((d,i)=>{
+    const isToday=d.key===todayKey;
+    chips+=`<div class="datechip ${i===activeIdx?"active":""} ${isToday?"hoy":""}" data-idx="${i}">${isToday?"Hoy · "+d.label:d.label}</div>`;
+  });
+
+  let html=`<div class="datesel">
+    <button class="dayarrow" id="prevDay" ${activeIdx<=0?"disabled":""}>‹</button>
+    <div class="datechips" id="datechips">${chips}</div>
+    <button class="dayarrow" id="nextDay" ${activeIdx>=days.length-1?"disabled":""}>›</button>
+  </div>`;
+  html+=`<div class="daygroup"><div class="dayhead"><span class="d">${activeDay.label}</span><span class="rule"></span></div>`;
+  for(const m of activeDay.matches)html+=matchCardHtml(m);
+  html+="</div>";
+  html+=`<div class="rules"><div><b>Cómo se ganan los puntos</b></div>
+    <div style="margin-top:8px"><span class="pill">+1</span> si aciertas quién gana (o el empate).</div>
+    <div><span class="pill">+2</span> extra si además clavas el marcador exacto. <span style="color:var(--muted)">(máximo <b style="color:var(--gold)">3</b> por partido)</span></div>
+    <div style="margin-top:8px">Cada partido se cierra a su hora de inicio.</div></div>`;
+  c.innerHTML=html;
+  for(const m of activeDay.matches){
+    const hi=document.getElementById("h_"+m.id),ai=document.getElementById("a_"+m.id);
+    matchEls[m.id]={hi,ai,cd:document.getElementById("cd_"+m.id),foot:document.getElementById("foot_"+m.id)};
+    const onIn=()=>handleInput(m.id);
+    if(hi)hi.oninput=onIn;if(ai)ai.oninput=onIn;
+    paintFoot(m);
+  }
+  document.getElementById("datechips").querySelectorAll(".datechip").forEach(ch=>{
+    ch.onclick=()=>{S.selectedDay=days[+ch.dataset.idx].key;renderView();};
+  });
+  const prevBtn=document.getElementById("prevDay"),nextBtn=document.getElementById("nextDay");
+  if(prevBtn)prevBtn.onclick=()=>{if(activeIdx>0){S.selectedDay=days[activeIdx-1].key;renderView();}};
+  if(nextBtn)nextBtn.onclick=()=>{if(activeIdx<days.length-1){S.selectedDay=days[activeIdx+1].key;renderView();}};
+  const activeChip=document.querySelector(".datechip.active");
+  if(activeChip)activeChip.scrollIntoView({behavior:"instant",inline:"center",block:"nearest"});
+}
+
+function clampVal(v){if(v==="")return"";let n=parseInt(v,10);if(isNaN(n))return"";if(n<0)n=0;if(n>49)n=49;return n;}
+function handleInput(id){
+  const e=matchEls[id];if(!e)return;
+  let h=clampVal(e.hi.value),a=clampVal(e.ai.value);
+  if(e.hi.value!==String(h))e.hi.value=h;
+  if(e.ai.value!==String(a))e.ai.value=a;
+  if(h===""||a==="")delete S.predsMe[id];else S.predsMe[id]={h,a};
+  S.dirty.add(id);updateSaveBar();
+}
+
+function paintFoot(m){
+  const e=matchEls[m.id];if(!e||!e.foot)return;
+  const locked=S.now>=m.kick,res=S.results[m.id],p=S.predsMe[m.id];
+  let left="",right="";
+  if(res){
+    if(p){const pp=ptsFor(p,res);const cls=pp===3?"p3":(pp===1?"p1":"p0");const txt=pp===3?"¡Marcador exacto!":(pp===1?"Acertaste el ganador":"No acertaste");left=`<span class="status">${txt}</span>`;right=`<span class="pts ${cls}">+${pp} pts</span>`;}
+    else{left=`<span class="status">No pronosticaste</span>`;right=`<span class="pts p0">0 pts</span>`;}
+  }else if(locked){
+    left=`<span class="status locked">🔒 Cerrado</span>`;
+    right=p?`<span class="status">Tu pronóstico: <b style="color:var(--line)">${p.h}–${p.a}</b></span>`:`<span class="status">Sin pronóstico</span>`;
+  }else{
+    left=`<span class="status">Abierto · escribe tu pronóstico</span>`;
+    right=p?`<span class="status" style="color:var(--mint);font-weight:700">✓ ${p.h}–${p.a} guardado</span>`:`<span class="status" style="color:var(--flare)">⚠️ sin pronóstico</span>`;
+  }
+  e.foot.innerHTML=`<span>${left}</span><span>${right}</span>`;
+}
+
+function updateSaveBar(){
+  const bar=document.getElementById("savebar"),inner=bar.firstElementChild;
+  if(S.view==="partidos"&&S.dirty.size>0){
+    inner.innerHTML=`<button class="btn" id="saveBtn">Guardar mis pronósticos (${S.dirty.size})</button>`;
+    document.getElementById("saveBtn").onclick=savePreds;bar.style.display="block";
+  }else if(S.view==="resultados"&&S.resDirty&&S.resDirty.size>0){
+    inner.innerHTML=`<button class="btn" id="saveResBtn">Guardar resultados (${S.resDirty.size})</button>`;
+    document.getElementById("saveResBtn").onclick=saveResultsBatch;bar.style.display="block";
+  }else bar.style.display="none";
+}
+
+async function savePreds(){
+  const byId={};allMatches().forEach(m=>byId[m.id]=m);
+  let dropped=0;
+  for(const id of[...S.dirty]){const m=byId[id];if(m&&S.now>=m.kick){dropped++;S.dirty.delete(id);}}
+  toast("Guardando en la nube...");
+  const ok=await setJSON("preds_"+S.me.id,S.predsMe,true);
+  await joinRoster();
+  S.allPreds[S.me.id]=Object.assign({},S.predsMe);
+  S.dirty.clear();updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();
+  if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión.",true,5000);
+  else if(dropped>0)toast(`✅ Guardado. ${dropped} ya cerrado(s).`,false,5000);
+  else toast(`✅ ¡${Object.keys(S.predsMe).length} pronósticos guardados!`,false,5000);
+}
+
+/* --- Ranking --- */
+function buildBoard(){
+  const ms=allMatches();
+  const finished=ms.filter(m=>S.results[m.id]);
+  const board=S.roster.map(pl=>{
+    const preds=S.allPreds[pl.id]||{};
+    let pts=0,ex=0,ac=0,played=0;
+    for(const m of finished){const p=preds[m.id],r=S.results[m.id];if(p){played++;const s=ptsFor(p,r);pts+=s;if(s===3)ex++;if(s>=1)ac++;}}
+    return{...pl,pts,ex,ac,played};
+  });
+  board.sort((a,b)=>b.pts-a.pts||b.ex-a.ex||b.ac-a.ac||a.name.localeCompare(b.name));
+  return{board,finished:finished.length,total:ms.length};
+}
+function renderRanking(c){
+  const{board,finished,total}=buildBoard();
+  if(board.length===0){c.innerHTML=`<div class="empty"><span class="big">🏟️</span>Todavía nadie se ha unido.</div>`;return;}
+  let rows="";
+  board.forEach((p,i)=>{
+    const rank=i+1,mine=S.me&&p.id===S.me.id;
+    const topcls=rank===1?"top1":rank===2?"top2":rank===3?"top3":"";
+    const medal=rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":"";
+    rows+=`<div class="row ${topcls} ${mine?"me":""}">
+      <div class="rank">${rank}</div>
+      <div class="who"><div class="nm"><span class="ico">${p.ico||"⚽"}</span>${escapeHtml(p.name)}${mine?' <span style="color:var(--mint);font-size:11px;font-weight:600">· tú</span>':""} ${medal}</div>
+      <div class="sub">${p.ex} exacto(s) · ${p.ac} acierto(s) · ${p.played} jugados</div></div>
+      <div class="score"><div class="pp">${p.pts}</div><div class="lbl">pts</div></div>
+    </div>`;
+  });
+  c.innerHTML=`<div class="lead"><div class="leadhead"><span class="t">Ranking</span><span class="meta">Resultados: ${finished}/${total}</span></div>${rows}</div>`;
+}
+
+async function showGroupEdit(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card">
+    <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
+    <h2>Editar grupo</h2>
+    <label class="field">Nombre del grupo/polla</label>
+    <input class="input" id="ge_name" maxlength="30" value="${escapeHtml(S.groupName||"")}">
+    <p style="color:var(--muted);font-size:12px;margin:12px 0 6px">Deja el PIN en blanco si no quieres cambiarlo.</p>
+    <label class="field">Nuevo PIN de administrador (opcional)</label>
+    <input class="input" id="ge_pin1" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:22px;text-align:center">
+    <label class="field" style="margin-top:8px">Confirma el nuevo PIN</label>
+    <input class="input" id="ge_pin2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:22px;text-align:center">
+    <div id="ge_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+    <button class="btn" id="ge_save" style="margin-top:10px">Guardar</button>
+    <button class="btn ghost" id="ge_cancel" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  document.getElementById("ge_cancel").onclick=()=>ov.remove();
+  document.getElementById("ge_save").onclick=async()=>{
+    const name=document.getElementById("ge_name").value.trim();
+    const p1=document.getElementById("ge_pin1").value.trim(),p2=document.getElementById("ge_pin2").value.trim();
+    const err=document.getElementById("ge_err");
+    if(!name){err.textContent="El nombre del grupo no puede quedar vacío.";return;}
+    if(p1||p2){
+      if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="El PIN debe tener 4 dígitos numéricos.";return;}
+      if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
+      await setJSON("adminPin",_hashPin(p1),true);
+    }
+    await setJSON("groupName",name,true);
+    S.groupName=name;
+    ov.remove();renderShell();renderView();
+    toast("Grupo actualizado ✓",false,3000);
+  };
+}
+
+async function editTeamName(id,side,current){
+  const val=prompt(`Nuevo nombre (equipo ${side==="home"?"local":"visitante"}):`,current);
+  if(val===null)return;
+  const name=val.trim();
+  if(!name){toast("El nombre no puede quedar vacío.",true);return;}
+  S.teamOverrides[id]=S.teamOverrides[id]||{};
+  S.teamOverrides[id][side]=name;
+  await setJSON("teamOverrides",S.teamOverrides,true);
+  toast("Nombre actualizado ✓",false,2500);
+  renderResultados(document.getElementById("content"));
+}
+
+/* --- Resultados (organizer) --- */
+function renderResultados(c){
+  S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
+  const ms=allMatches().slice().sort((a,b)=>b.kick-a.kick);
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Carga el <b>resultado oficial</b> o agrega nuevos cruces.</div>`;
+  html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
+  html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Sincronizar Resultados FIFA en Vivo</button></div>`;
+  html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
+  html+=`<div class="addbox"><div class="ttl">➕ Agregar partido eliminatorio</div><div class="addgrid">
+    <input class="mini" id="cm_home" placeholder="Equipo local">
+    <input class="mini" id="cm_away" placeholder="Equipo visitante">
+    <input class="mini" id="cm_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <input class="mini" id="cm_time" type="time" value="14:00">
+    <input class="mini full" id="cm_fase" placeholder="Fase (ej: Cuartos, Semis, Final)">
+    <button class="smallbtn full" id="cm_add">Agregar partido</button>
+  </div></div>`;
+  for(const m of ms){
+    const r=S.resWork[m.id]||{},locked=S.now>=m.kick;
+    html+=`<div class="match" style="border-radius:14px">
+      <div class="mtop"><span class="grp">🏆 ${m.g}</span>
+      <span class="when">${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}</span></div>
+      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button><input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}"></div>
+      <div class="divider"></div>
+      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span><button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button><input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}"></div>
+    </div>`;
+  }
+  c.innerHTML=html;
+  document.getElementById("cm_add").onclick=addCustomMatch;
+  c.querySelectorAll(".editnm").forEach(b=>{
+    b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
+  });
+  for(const m of ms){
+    const rh=document.getElementById("rh_"+m.id),ra=document.getElementById("ra_"+m.id);
+    if(!rh||!ra)continue;
+    const on=()=>{
+      let h=clampVal(rh.value),a=clampVal(ra.value);
+      if(rh.value!==String(h))rh.value=h;if(ra.value!==String(a))ra.value=a;
+      if(h===""||a==="")delete S.resWork[m.id];else S.resWork[m.id]={h,a};
+      S.resDirty.add(m.id);updateSaveBar();
+    };
+    rh.oninput=on;ra.oninput=on;
+  }
+  updateSaveBar();
+}
+async function saveResultsBatch(){
+  S.results=Object.assign({},S.resWork);
+  Object.keys(S.results).forEach(k=>{const r=S.results[k];if(!r||r.h==null||r.a==null)delete S.results[k];});
+  toast("Actualizando marcadores...");
+  const ok=await setJSON("results",S.results,true);
+  S.resDirty.clear();updateSaveBar();
+  toast(ok?"Resultados guardados ✓":"Error al guardar",!ok);
+  if(S.view==="ranking")renderRanking(document.getElementById("content"));
+}
+async function addCustomMatch(){
+  const home=document.getElementById("cm_home").value.trim();
+  const away=document.getElementById("cm_away").value.trim();
+  const d=document.getElementById("cm_date").value,t=document.getElementById("cm_time").value;
+  const fase=document.getElementById("cm_fase").value.trim()||"Eliminatoria";
+  if(!home||!away||!d||!t){toast("Completa equipos, fecha y hora.",true);return;}
+  const kick=new Date(`${d}T${t}:00-05:00`).getTime();
+  if(isNaN(kick)){toast("Fecha u hora inválida.",true);return;}
+  const id="c_"+Math.random().toString(36).slice(2,8);
+  S.custom.push({id,g:fase,home,away,kick});
+  await setJSON("custom",S.custom,true);
+  toast("Partido agregado ✓");
+  renderResultados(document.getElementById("content"));
+}
+
+/* --- Configuración inicial del grupo (solo la primera vez) --- */
+function showGroupSetup(onDone){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card">
+    <div class="kicker" style="color:var(--mint)">Configuración inicial</div>
+    <h2>Crea tu polla</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Eres la primera persona en abrir este link. Configura tu grupo antes de invitar a los demás — esto solo se pide una vez.</p>
+    <label class="field">Nombre de tu grupo/polla</label>
+    <input class="input" id="gn_in" maxlength="30" placeholder="Ej: Familia Pérez, Amigos del Fútbol...">
+    <label class="field" style="margin-top:10px">PIN de administrador (4 dígitos)</label>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 6px">Lo usarás para entrar al panel de organizador y cargar resultados. Guárdalo bien.</p>
+    <input class="input" id="ap1_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
+    <label class="field" style="margin-top:10px">Confirma el PIN</label>
+    <input class="input" id="ap2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
+    <div id="gs_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+    <button class="btn" id="gs_save" style="margin-top:14px">Crear grupo</button>
+  </div>`;
+  document.getElementById("gs_save").onclick=async()=>{
+    const name=document.getElementById("gn_in").value.trim();
+    const p1=document.getElementById("ap1_in").value.trim(),p2=document.getElementById("ap2_in").value.trim();
+    const err=document.getElementById("gs_err");
+    if(!name){err.textContent="Escribe el nombre de tu grupo.";return;}
+    if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="El PIN debe tener 4 dígitos numéricos.";return;}
+    if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
+    document.getElementById("gs_save").disabled=true;
+    await setJSON("groupName",name,true);
+    await setJSON("adminPin",_hashPin(p1),true);
+    S.groupName=name;
+    ov.remove();
+    toast(`Grupo "${name}" creado ✓ Guarda tu PIN.`,false,5000);
+    if(onDone)onDone();
+  };
+}
+
+/* --- Login con lista + PIN --- */
+async function showOnboarding(isChange){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const roster=(await getJSON("roster",true))||[];
+
+  function renderSelectScreen(){
+    pendingIco=AVATARS[0];
+    ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+      <div class="kicker" style="color:var(--mint)">Bienvenido a la polla</div>
+      <h2>¿Quién juega?</h2>
+      ${roster.length>0?`
+        <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Selecciona tu nombre o regístrate si eres nuevo.</p>
+        <input class="input" id="search_in" placeholder="🔍 Buscar jugador..." style="margin-bottom:10px">
+        <div id="player_list" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;margin-bottom:14px"></div>
+        <div style="height:1px;background:var(--faint);margin:10px 0"></div>
+      `:`<p style="color:var(--muted);font-size:13px;margin:0 0 16px">¡Sé el primero en registrarte!</p>`}
+      <button class="btn ghost" id="newPlayerBtn">➕ Soy nuevo / registrarme</button>
+      ${isChange?`<button class="btn ghost" id="cancelBtn" style="margin-top:10px;border-color:var(--flare);color:var(--flare)">Cancelar</button>`:""}
+    </div>`;
+    function renderList(filter){
+      const list=document.getElementById("player_list");if(!list)return;
+      const filtered=roster.filter(p=>p.name.toLowerCase().includes(filter.toLowerCase()));
+      if(!filtered.length){list.innerHTML=`<div style="color:var(--muted);font-size:13px;text-align:center;padding:12px">Sin resultados</div>`;return;}
+      list.innerHTML=filtered.map(p=>`<button class="player-row" data-id="${p.id}" style="display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--faint);border-radius:12px;padding:12px 14px;cursor:pointer;color:var(--line);font:inherit;text-align:left">
+        <span style="font-size:22px">${p.ico||"⚽"}</span><span style="font-weight:700;font-size:15px;flex:1">${escapeHtml(p.name)}</span><span style="color:var(--muted);font-size:12px">→</span></button>`).join("");
+      list.querySelectorAll(".player-row").forEach(btn=>{
+        btn.onclick=()=>{const pl=roster.find(p=>p.id===btn.dataset.id);if(pl)renderPinScreen(pl);};
+      });
+    }
+    renderList("");
+    const si=document.getElementById("search_in");if(si)si.oninput=()=>renderList(si.value);
+    document.getElementById("newPlayerBtn").onclick=renderNewPlayerScreen;
+    const cb=document.getElementById("cancelBtn");if(cb)cb.onclick=()=>ov.remove();
+  }
+
+  function renderPinScreen(player){
+    ov.innerHTML=`<div class="card">
+      <button id="backBtn" style="background:none;border:none;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;padding:0 0 12px;display:flex;align-items:center;gap:6px">← Volver</button>
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:42px">${player.ico||"⚽"}</div>
+        <div style="font-weight:700;font-size:18px;margin-top:6px">${escapeHtml(player.name)}</div>
+      </div>
+      <label class="field">Tu PIN de 4 dígitos</label>
+      <input class="input" id="pin_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
+      <div id="pin_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+      <button class="btn" id="enterBtn" style="margin-top:14px">Entrar</button>
+      <button id="forgotBtn" style="background:none;border:none;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:10px;display:block;margin:0 auto">Olvidé mi PIN</button>
+    </div>`;
+    document.getElementById("backBtn").onclick=renderSelectScreen;
+    const pi=document.getElementById("pin_in");
+    setTimeout(()=>pi.focus(),80);
+    async function tryLogin(){
+      const pin=pi.value.trim();
+      if(pin.length<4){document.getElementById("pin_err").textContent="El PIN debe tener 4 dígitos.";return;}
+      const storedHash=await getJSON("pin_"+player.id,true);
+      if(!storedHash){await _loginPlayer(player,pin,true);return;}
+      if(_hashPin(pin)!==storedHash){document.getElementById("pin_err").textContent="PIN incorrecto. Intenta de nuevo.";pi.value="";pi.focus();return;}
+      await _loginPlayer(player,pin,false);
+    }
+    document.getElementById("enterBtn").onclick=tryLogin;
+    pi.onkeydown=e=>{if(e.key==="Enter")tryLogin();};
+    document.getElementById("forgotBtn").onclick=()=>{
+      ov.innerHTML=`<div class="card">
+        <h2 style="font-size:20px">PIN olvidado</h2>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Contacta al organizador de la polla para que resetee tu PIN.</p>
+        <p style="color:var(--muted);font-size:13px">Jugador: <b style="color:var(--line)">${escapeHtml(player.name)}</b></p>
+        <button class="btn ghost" id="backBtn2" style="margin-top:16px">← Volver</button>
+      </div>`;
+      document.getElementById("backBtn2").onclick=()=>renderPinScreen(player);
+    };
+  }
+
+  function renderNewPlayerScreen(){
+    pendingIco=AVATARS[0];
+    ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+      <button id="backBtn" style="background:none;border:none;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;padding:0 0 12px;display:flex;align-items:center;gap:6px">← Volver</button>
+      <div class="kicker" style="color:var(--mint)">Nuevo jugador</div>
+      <h2>Crea tu perfil</h2>
+      <label class="field">Tu nombre</label>
+      <input class="input" id="nm_in" maxlength="20" placeholder="Ej: Martín">
+      <div class="avatars" id="avs" style="margin:14px 0 16px"></div>
+      <label class="field">PIN de 4 dígitos</label>
+      <input class="input" id="pin1_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
+      <label class="field" style="margin-top:10px">Confirma tu PIN</label>
+      <input class="input" id="pin2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
+      <div id="reg_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+      <div style="background:rgba(54,224,191,.08);border:1px solid rgba(54,224,191,.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);margin:10px 0 16px">
+        💡 <b style="color:var(--line)">Guarda tu PIN</b> — lo necesitarás cada vez que entres, incluso desde otro celular.
+      </div>
+      <button class="btn" id="regBtn">Registrarme y entrar</button>
+    </div>`;
+    document.getElementById("backBtn").onclick=renderSelectScreen;
+    const avs=ov.querySelector("#avs");
+    AVATARS.forEach(a=>{
+      const d=document.createElement("div");d.className="av"+(a===pendingIco?" sel":"");d.textContent=a;
+      d.onclick=()=>{pendingIco=a;avs.querySelectorAll(".av").forEach(x=>x.classList.toggle("sel",x.textContent===a));};
+      avs.appendChild(d);
+    });
+    const inp=document.getElementById("nm_in");setTimeout(()=>inp.focus(),80);
+    document.getElementById("regBtn").onclick=async()=>{
+      const name=inp.value.trim();
+      const pin1=document.getElementById("pin1_in").value.trim();
+      const pin2=document.getElementById("pin2_in").value.trim();
+      const err=document.getElementById("reg_err");
+      if(!name){inp.focus();inp.style.borderColor="var(--flare)";err.textContent="Escribe tu nombre.";return;}
+      if(pin1.length<4){err.textContent="El PIN debe tener 4 dígitos.";return;}
+      if(pin1!==pin2){err.textContent="Los PINes no coinciden.";return;}
+      if(roster.find(p=>p.name.toLowerCase()===name.toLowerCase())){err.textContent="Ya existe ese nombre. ¿Eres tú? Selecciónate de la lista.";return;}
+      const newId="p_"+Math.random().toString(36).slice(2,9);
+      S.me={id:newId,name,ico:pendingIco};
+      await setJSON("me",S.me,false);
+      await setJSON("pin_"+newId,_hashPin(pin1),true);
+      await joinRoster();
+      ov.remove();renderShell();renderView();
+      toast(`¡Bienvenido ${name}! Guarda tu PIN.`,false,5000);
+    };
+  }
+
+  async function _loginPlayer(player,pin,isFirstTime){
+    S.me={id:player.id,name:player.name,ico:player.ico};
+    await setJSON("me",S.me,false);
+    if(isFirstTime){
+      await setJSON("pin_"+player.id,_hashPin(pin),true);
+      toast(`¡Hola ${player.name}! PIN creado. Recuérdalo.`,false,5000);
+    }
+    await _migrarPronosticos(player.id);
+    S.predsMe=(await getJSON("preds_"+player.id,true))||{};
+    await joinRoster();
+    ov.remove();renderShell();renderView();
+    if(!isFirstTime)toast(`¡Bienvenido de vuelta, ${player.name}!`,false,3000);
+  }
+
+  if(isChange&&S.me){
+    const player=roster.find(p=>p.id===S.me.id);
+    if(player){renderPinScreen(player);return;}
+  }
+  renderSelectScreen();
+}
+
+async function joinRoster(){
+  await cloudCall({action:"joinRoster", player:S.me});
+  // Recargar el roster actualizado desde la nube
+  const fresh = await getJSON("roster", true);
+  if(fresh) S.roster = fresh;
+  else if(!S.roster.some(p=>p.id===S.me.id)) S.roster.push(S.me);
+}
+
+async function _migrarPronosticos(targetId){
+  try{
+    const existing=await getJSON("preds_"+targetId,true);
+    if(existing&&Object.keys(existing).length>0)return;
+    const roster=(await getJSON("roster",true))||[];
+    const myName=S.me.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const oldEntry=roster.find(p=>p.id!==targetId&&p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")===myName&&p.id.startsWith("p_"));
+    if(oldEntry){
+      const oldPreds=await getJSON("preds_"+oldEntry.id,true);
+      if(oldPreds&&Object.keys(oldPreds).length>0)await setJSON("preds_"+targetId,oldPreds,true);
+    }
+  }catch(e){console.error("Error migrando:",e);}
+}
+
+async function showPinReset(){
+  const roster=(await getJSON("roster",true))||[];
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  ov.innerHTML=`<div class="card">
+    <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
+    <h2>Resetear PIN</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Selecciona el jugador cuyo PIN quieres resetear.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:16px">
+      ${roster.map(p=>`<button class="pr-row" data-id="${p.id}" style="display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--faint);border-radius:12px;padding:11px 14px;cursor:pointer;color:var(--line);font:inherit;text-align:left">
+        <span style="font-size:20px">${p.ico||"⚽"}</span><span style="font-weight:700;flex:1">${escapeHtml(p.name)}</span><span style="color:var(--flare);font-size:12px">Resetear →</span></button>`).join("")}
+    </div>
+    <button class="btn ghost" id="cancelPR">Cancelar</button>
+  </div>`;
+  document.body.appendChild(ov);
+  document.getElementById("cancelPR").onclick=()=>ov.remove();
+  ov.querySelectorAll(".pr-row").forEach(btn=>{
+    btn.onclick=async()=>{
+      const pl=roster.find(p=>p.id===btn.dataset.id);if(!pl)return;
+      await setJSON("pin_"+pl.id,null,true);
+      ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
+    };
+  });
+}
+
+/* --- Tick --- */
+function tick(){
+  S.now=Date.now();
+  if(S.view!=="partidos")return;
+  for(const m of allMatches()){
+    const e=matchEls[m.id];if(!e)continue;
+    const diff=m.kick-S.now,info=cd(diff);
+    if(e.cd){if(info){e.cd.textContent="Cierra en "+info.t;e.cd.className="cd"+(info.soon?" soon":"");}else{e.cd.textContent="Cerrado";e.cd.className="cd closed";}}
+    const locked=S.now>=m.kick;
+    if(e.hi&&e.hi.disabled!==locked){e.hi.disabled=locked;e.ai.disabled=locked;paintFoot(m);}
+  }
+}
+setInterval(tick,1000);
+
+/* --- Sync --- */
+async function refreshShared(){
+  try{
+    const ok=await fetchAllShared();if(!ok)return;
+    const roster=(await getJSON("roster",true))||S.roster;
+    const results=(await getJSON("results",true))||{};
+    const custom=(await getJSON("custom",true))||[];
+    S.roster=roster;S.custom=custom;
+    const resChanged=JSON.stringify(results)!==JSON.stringify(S.results);
+    S.results=results;
+    const preds={};
+    for(const pl of roster)preds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
+    S.allPreds=preds;
+    if(S.me){
+      const fresh=(await getJSON("preds_"+S.me.id,true))||{};
+      for(const id of S.dirty)if(S.predsMe[id]!=null)fresh[id]=S.predsMe[id];
+      const changed=JSON.stringify(fresh)!==JSON.stringify(S.predsMe);
+      S.predsMe=fresh;S.allPreds[S.me.id]=Object.assign({},S.predsMe);
+      if(S.view==="ranking")renderRanking(document.getElementById("content"));
+      else if(S.view==="partidos"&&(resChanged||changed)&&S.dirty.size===0)renderPartidos(document.getElementById("content"));
+      else if(S.view==="partidos"&&resChanged)allMatches().forEach(m=>paintFoot(m));
+    }else{
+      if(S.view==="ranking")renderRanking(document.getElementById("content"));
+      else if(S.view==="partidos"&&resChanged)allMatches().forEach(m=>paintFoot(m));
+    }
+    paintMyStats();
+  }catch(e){console.error(e);}
+}
+setInterval(refreshShared,25000);
+window.addEventListener("focus",refreshShared);
+
+/* --- Boot --- */
+(async function boot(){
+  try{
+    S.allPreds={};
+    S.me=await getJSON("me",false);
+    S.organizer=(await getJSON("organizer",false))||false;
+    await fetchAllShared();
+    S.results=(await getJSON("results",true))||{};
+    S.custom=(await getJSON("custom",true))||[];
+    S.roster=(await getJSON("roster",true))||[];
+    S.groupName=await getJSON("groupName",true);
+    S.teamOverrides=(await getJSON("teamOverrides",true))||{};
+    if(S.me){S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};await joinRoster();}
+    for(const pl of S.roster)S.allPreds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
+    if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
+    await refreshShared();
+    if(!S.groupName){
+      showGroupSetup(()=>{renderShell();renderView();if(!S.me)showOnboarding(false);});
+      return;
+    }
+    renderShell();renderView();
+    if(!S.me)showOnboarding(false);
+  }catch(e){console.error("Boot error:",e);renderShell();renderView();}
+})();
+
+function forzarSincronizacionAPI(){
+  const btn=document.getElementById("api_sync_btn");
+  if(btn){btn.innerText="⏳ Conectando...";btn.disabled=true;btn.style.backgroundColor="#83a294";}
+  fetchAllShared().then(()=>{toast("¡Sincronizado! ⚽");setTimeout(()=>location.reload(),800);}).catch(()=>{toast("Sincronizando...");setTimeout(()=>location.reload(),800);});
+}
+</script>
