@@ -137,7 +137,15 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL="PEGA_AQUÍ_LA_URL_DE_TU_APPS_SCRIPT"; // ⚠️ Reemplaza con la URL de TU despliegue de Apps Script (Sheet nuevo y separado de Familia Tezna)
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KSrvVowdHXk7bi5ldBeqcR0_ELzhhhwBsnLOhUTkUlgZkct/exec"; // ⚠️ Reemplaza con la URL de TU despliegue de Apps Script (Sheet nuevo y separado de Familia Tezna)
+
+/* --- Multi-tenant: cada cliente vendido = una pestaña distinta de la misma hoja (kv1, kv2, kv3...) ---
+   Se define con ?tab=kv3 en el link que le compartes a cada cliente.
+   Ej: https://predigoles.com/?tab=kv3
+   Si no viene en la URL, usa el último que se usó en este dispositivo (localStorage), y si tampoco existe, "kv1" por defecto. */
+const _qp=new URLSearchParams(location.search);
+const TAB=(_qp.get("tab")||localStorage.getItem("pg_tab")||"kv1").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"kv1";
+localStorage.setItem("pg_tab",TAB);
 
 const RAW=[
 // Confirmados (fecha/hora en referencia Colombia -05:00, cruzadas entre varias fuentes el 3-jul-2026):
@@ -168,7 +176,7 @@ const flag=n=>FLAG[n]||"⚽";
 const CACHE={};
 async function cloudCall(data){
   if(!SCRIPT_URL||SCRIPT_URL.includes("AQUÍ")) return null;
-  try{const r=await fetch(SCRIPT_URL,{method:"POST",mode:"cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify(data)});return await r.json();}
+  try{const r=await fetch(SCRIPT_URL,{method:"POST",mode:"cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({...data,tab:TAB})});return await r.json();}
   catch(e){console.error("cloudCall error",e);return null;}
 }
 async function sGet(k,sh){if(!sh)return localStorage.getItem("p:"+k);return CACHE[k]??null;}
@@ -531,7 +539,7 @@ async function editTeamName(id,side,current){
 function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
   const ms=allMatches().slice().sort((a,b)=>b.kick-a.kick);
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">Carga el <b>resultado oficial</b> o agrega nuevos cruces.</div>`;
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Carga el <b>resultado oficial</b> o agrega nuevos cruces.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Sincronizar Resultados FIFA en Vivo</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
