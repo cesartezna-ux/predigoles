@@ -127,6 +127,8 @@
   .cols .colh{width:46px;flex:none;text-align:center;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .box.ro{display:flex;align-items:center;justify-content:center;color:var(--gold);background:#06120d}
   .box.real{display:flex;align-items:center;justify-content:center;color:var(--mint);border-color:rgba(54,224,191,.35)}
+  .box.real.live{color:var(--flare);border-color:rgba(255,77,109,.4);animation:pulse-live 2s ease-in-out infinite}
+  @keyframes pulse-live{0%,100%{opacity:1}50%{opacity:.6}}
   .mystats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .mystats .sb{background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
   .mystats .sb b{color:var(--gold);font-family:var(--score);font-size:16px}
@@ -198,7 +200,7 @@ async function fetchAllShared(){
 }
 
 /* --- State --- */
-const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{}};
+const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{},live:{}};
 const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","🎯","👑","🐺"];
 let pendingIco=AVATARS[0];
 
@@ -260,6 +262,7 @@ function renderShell(){
       </header>
       <div class="tabs" id="tabs">
         <div class="tab" data-v="partidos">Partidos</div>
+        <div class="tab" data-v="envivo">En Vivo</div>
         <div class="tab" data-v="ranking">Ranking</div>
         <div class="tab" data-v="resultados" style="display:none">Resultados</div>
       </div>
@@ -308,32 +311,44 @@ function renderView(){
   const c=document.getElementById("content");
   matchEls={};
   if(S.view==="partidos")renderPartidos(c);
+  else if(S.view==="envivo")renderEnVivo(c);
   else if(S.view==="ranking")renderRanking(c);
   else renderResultados(c);
   updateSaveBar();tick();paintMyStats();
 }
 
+function tiempoDesde(iso){
+  if(!iso)return"";
+  const min=Math.max(0,Math.round((S.now-new Date(iso).getTime())/60000));
+  if(min<1)return"hace instantes";
+  if(min===1)return"hace 1m";
+  return`hace ${min}m`;
+}
 function matchCardHtml(m){
   const locked=S.now>=m.kick;
   const p=S.predsMe[m.id]||{};
   const res=S.results[m.id];
+  const live=!res?S.live[m.id]:null;
   const colo=COLO(m);
   const ph=(p.h!=null?p.h:""),pa=(p.a!=null?p.a:"");
-  const rh=res?res.h:"–",ra=res?res.a:"–";
+  const rh=res?res.h:(live?live.h:"–"),ra=res?res.a:(live?live.a:"–");
   const homeWin=res&&+res.h>+res.a,awayWin=res&&+res.a>+res.h;
   const predBox=(side,val)=>locked
     ?`<div class="box ro">${val!==""?val:"–"}</div>`
     :`<input class="box" id="${side}_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${val}">`;
+  const whenInner=live
+    ?`<span class="cd soon">🔴 ${live.minute!=null?live.minute+"'":"EN VIVO"} · ${tiempoDesde(live.syncedAt)}</span>`
+    :`<span class="cd" id="cd_${m.id}"></span>`;
   return`<div class="match ${colo?"col":""}" id="card_${m.id}">
     <div class="mtop">
       <span class="grp ${colo?"colrib":""}">${colo?"¡Juega Colombia! 🇨🇴":m.g}</span>
-      <span class="when">${whenHtml(m.kick)}<span class="cd" id="cd_${m.id}"></span></span>
+      <span class="when">${whenHtml(m.kick)}${whenInner}</span>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:4px;">📍 ${escapeHtml(m.venue)}</div>
     <div class="cols"><span class="sp"></span><span class="colh">Pron.</span><span class="colh">Real</span></div>
-    <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm ${homeWin?"win":""}">${escapeHtml(m.home)}</span>${predBox("h",ph)}<div class="box real">${rh}</div></div>
+    <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm ${homeWin?"win":""}">${escapeHtml(m.home)}</span>${predBox("h",ph)}<div class="box real${live?" live":""}">${rh}</div></div>
     <div class="divider"></div>
-    <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm ${awayWin?"win":""}">${escapeHtml(m.away)}</span>${predBox("a",pa)}<div class="box real">${ra}</div></div>
+    <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm ${awayWin?"win":""}">${escapeHtml(m.away)}</span>${predBox("a",pa)}<div class="box real${live?" live":""}">${ra}</div></div>
     <div class="mfoot" id="foot_${m.id}"></div>
   </div>`;
 }
@@ -453,6 +468,43 @@ async function savePreds(){
   if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión.",true,5000);
   else if(dropped>0)toast(`✅ Guardado. ${dropped} ya cerrado(s).`,false,5000);
   else toast(`✅ ¡${Object.keys(S.predsMe).length} pronósticos guardados!`,false,5000);
+}
+
+/* --- En Vivo: pronósticos del partido que está jugándose ahora --- */
+function renderEnVivo(c){
+  const now=S.now;
+  const DURACION_MAX=3*60*60*1000; // 3h cubre 90' + entretiempo + prórroga + penales
+  const activos=allMatches().filter(m=>m.kick<=now && !S.results[m.id] && (now-m.kick)<DURACION_MAX);
+
+  if(!activos.length){
+    c.innerHTML=`<div class="empty"><span class="big">⏱️</span>No hay ningún partido en juego en este momento.<br><span style="font-size:12px">Cuando arranque el próximo, vas a ver aquí los pronósticos de todos.</span></div>`;
+    return;
+  }
+
+  let html="";
+  activos.forEach(m=>{
+    const colo=COLO(m);
+    const live=S.live[m.id];
+    const detalle=live?`🔴 ${live.minute!=null?live.minute+"'":"EN VIVO"} · actualizado ${tiempoDesde(live.syncedAt)}`:"🔴 EN JUEGO · esperando marcador";
+    html+=`<div class="match ${colo?"col":""}" style="padding:14px 14px 12px">
+      <div class="mtop">
+        <span class="grp ${colo?"colrib":""}">${colo?"¡Juega Colombia! 🇨🇴":m.g}</span>
+        <span class="when" style="color:var(--flare);font-weight:700">${detalle}</span>
+      </div>
+      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span>${live?`<span style="font-family:var(--score);font-size:22px;color:var(--flare);margin-left:auto">${live.h}</span>`:""}</div>
+      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span>${live?`<span style="font-family:var(--score);font-size:22px;color:var(--flare);margin-left:auto">${live.a}</span>`:""}</div>
+    </div>`;
+    const filas=S.roster.map(p=>({p,pr:(S.allPreds[p.id]||{})[m.id]}));
+    filas.sort((a,b)=>(b.pr?1:0)-(a.pr?1:0)||a.p.name.localeCompare(b.p.name));
+    filas.forEach(({p,pr})=>{
+      const mine=S.me&&p.id===S.me.id;
+      html+=`<div class="row ${mine?"me":""}">
+        <div class="who"><div class="nm"><span class="ico">${p.ico||"⚽"}</span>${escapeHtml(p.name)}${mine?' <span style="color:var(--mint);font-size:11px;font-weight:600">· tú</span>':""}</div></div>
+        <div class="score"><div class="pp" style="font-size:22px">${pr?pr.h+"–"+pr.a:"–"}</div><div class="lbl">${pr?"pronóstico":"sin pronóstico"}</div></div>
+      </div>`;
+    });
+  });
+  c.innerHTML=html;
 }
 
 /* --- Ranking --- */
@@ -860,6 +912,7 @@ async function refreshShared(){
     const results=(await getJSON("results",true))||{};
     const custom=(await getJSON("custom",true))||[];
     S.roster=roster;S.custom=custom;
+    S.live=(await getJSON("live",true))||{};
     const resChanged=JSON.stringify(results)!==JSON.stringify(S.results);
     S.results=results;
     const preds={};
@@ -871,10 +924,12 @@ async function refreshShared(){
       const changed=JSON.stringify(fresh)!==JSON.stringify(S.predsMe);
       S.predsMe=fresh;S.allPreds[S.me.id]=Object.assign({},S.predsMe);
       if(S.view==="ranking")renderRanking(document.getElementById("content"));
+      else if(S.view==="envivo")renderEnVivo(document.getElementById("content"));
       else if(S.view==="partidos"&&(resChanged||changed)&&S.dirty.size===0)renderPartidos(document.getElementById("content"));
       else if(S.view==="partidos"&&resChanged)allMatches().forEach(m=>paintFoot(m));
     }else{
       if(S.view==="ranking")renderRanking(document.getElementById("content"));
+      else if(S.view==="envivo")renderEnVivo(document.getElementById("content"));
       else if(S.view==="partidos"&&resChanged)allMatches().forEach(m=>paintFoot(m));
     }
     paintMyStats();
@@ -895,6 +950,7 @@ window.addEventListener("focus",refreshShared);
     S.roster=(await getJSON("roster",true))||[];
     S.groupName=await getJSON("groupName",true);
     S.teamOverrides=(await getJSON("teamOverrides",true))||{};
+    S.live=(await getJSON("live",true))||{};
     if(S.me){S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};await joinRoster();}
     for(const pl of S.roster)S.allPreds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
     if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
@@ -926,6 +982,7 @@ function forzarSincronizacionAPI(){
     await refreshShared();
     if(S.view==="resultados")renderResultados(document.getElementById("content"));
     else if(S.view==="ranking")renderRanking(document.getElementById("content"));
+    else if(S.view==="envivo")renderEnVivo(document.getElementById("content"));
     else if(S.view==="partidos")allMatches().forEach(m=>paintFoot(m));
   });
 }
