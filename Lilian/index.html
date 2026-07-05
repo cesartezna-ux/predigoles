@@ -559,7 +559,7 @@ function renderResultados(c){
   
   let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Configura los cruces de las fases finales usando el botón ✏️ o gestiona el grupo.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
-  html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Sincronizar Resultados FIFA en Vivo</button></div>`;
+  html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Forzar sincronización ahora</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
   
   for(const m of ms){
@@ -618,7 +618,7 @@ function showGroupSetup(onDone){
     <label class="field" style="margin-top:10px">Confirma el PIN</label>
     <input class="input" id="ap2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
     <div id="gs_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
-    <button class="btn" id="gs_save" style="margin-top:16px">Crar grupo</button>
+    <button class="btn" id="gs_save" style="margin-top:16px">Crear grupo</button>
   </div>`;
   document.getElementById("gs_save").onclick=async()=>{
     const name=document.getElementById("gn_in").value.trim();
@@ -743,15 +743,25 @@ async function showOnboarding(isChange){
       const pin1=document.getElementById("pin1_in").value.trim();
       const pin2=document.getElementById("pin2_in").value.trim();
       const err=document.getElementById("reg_err");
+      const btn=document.getElementById("regBtn");
       if(!name){inp.focus();inp.style.borderColor="var(--flare)";err.textContent="Escribe tu nombre.";return;}
       if(pin1.length<4){err.textContent="El PIN debe tener 4 dígitos.";return;}
       if(pin1!==pin2){err.textContent="Los PINes no coinciden.";return;}
+      // Chequeo rápido local (feedback inmediato); la verificación real y a prueba de
+      // condiciones de carrera ocurre en el servidor al llamar joinRoster() abajo.
       if(roster.find(p=>p.name.toLowerCase()===name.toLowerCase())){err.textContent="Ya existe ese nombre. ¿Eres tú? Selecciónate de la lista.";return;}
+      btn.disabled=true;
       const newId="p_"+Math.random().toString(36).slice(2,9);
       S.me={id:newId,name,ico:pendingIco};
       await setJSON("me",S.me,false);
       await setJSON("pin_"+newId,_hashPin(pin1),true);
-      await joinRoster();
+      const r=await joinRoster();
+      if(r&&r.status==="name_taken"){
+        btn.disabled=false;
+        err.textContent="Ese nombre ya lo tomó alguien más justo ahora. ¿Eres tú? Vuelve y selecciónate de la lista.";
+        S.me=null;await setJSON("me",null,false);
+        return;
+      }
       ov.remove();renderShell();renderView();
       toast(`¡Bienvenido ${name}! Guarda tu PIN.`,false,5000);
     };
@@ -779,10 +789,14 @@ async function showOnboarding(isChange){
 }
 
 async function joinRoster(){
-  await cloudCall({action:"joinRoster", player:S.me});
-  const fresh = await getJSON("roster", true);
-  if(fresh) S.roster = fresh;
-  else if(!S.roster.some(p=>p.id===S.me.id)) S.roster.push(S.me);
+  const r=await cloudCall({action:"joinRoster",player:S.me});
+  if(r&&r.status==="success"&&r.roster){
+    S.roster=r.roster;
+    CACHE["roster"]=JSON.stringify(r.roster);
+  } else if(!(r&&r.status==="name_taken")&&!S.roster.some(p=>p.id===S.me.id)){
+    S.roster.push(S.me); // fallback local si falla la red — se reintentará en el próximo refreshShared()
+  }
+  return r;
 }
 
 async function _migrarPronosticos(targetId){
@@ -902,8 +916,17 @@ window.addEventListener("focus",refreshShared);
 })();
 
 function forzarSincronizacionAPI(){
-  const btn=document.getElementById("api_sync_btn");
-  if(btn){btn.innerText="⏳ Conectando...";btn.disabled=true;btn.style.backgroundColor="#83a294";}
-  fetchAllShared().then(()=>{toast("¡Sincronizado! ⚽");setTimeout(()=>location.reload(),800);}).catch(()=>{toast("Sincronizando...");setTimeout(()=>location.reload(),800);});
+  toast("Consultando resultados en vivo...");
+  cloudCall({action:"syncNow"}).then(async (r)=>{
+    if(r&&r.status==="success"){
+      toast(`✅ ${r.sincronizados} partido(s) actualizado(s)`,false,3500);
+    } else {
+      toast("No se pudo sincronizar. Intenta de nuevo.",true,3500);
+    }
+    await refreshShared();
+    if(S.view==="resultados")renderResultados(document.getElementById("content"));
+    else if(S.view==="ranking")renderRanking(document.getElementById("content"));
+    else if(S.view==="partidos")allMatches().forEach(m=>paintFoot(m));
+  });
 }
 </script>
