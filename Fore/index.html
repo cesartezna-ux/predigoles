@@ -951,10 +951,15 @@ window.addEventListener("focus",refreshShared);
     S.groupName=await getJSON("groupName",true);
     S.teamOverrides=(await getJSON("teamOverrides",true))||{};
     S.live=(await getJSON("live",true))||{};
-    if(S.me){S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};await joinRoster();}
+    if(S.me){
+      S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};
+      // Solo llamamos al backend a "unirse" si hace falta de verdad (jugador nuevo
+      // o cambió nombre/avatar) — si ya está igual en el roster, nos ahorramos el viaje de red.
+      const yaEnRoster=S.roster.some(p=>p.id===S.me.id&&p.name===S.me.name&&p.ico===S.me.ico);
+      if(!yaEnRoster)await joinRoster();
+    }
     for(const pl of S.roster)S.allPreds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
     if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
-    await refreshShared();
     
     // Si no hay un nombre de grupo creado en esta pestaña (Momento Cero), forzar configuración verde
     if(!S.groupName){
