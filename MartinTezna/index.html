@@ -200,7 +200,7 @@ async function fetchAllShared(){
 }
 
 /* --- State --- */
-const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{},live:{}};
+const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{},live:{},betting:{inscripcion:0,adminPct:0,premios:{p1:0,p2:0,p3:0},pagos:{}}};
 const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","🎯","👑","🐺"];
 let pendingIco=AVATARS[0];
 
@@ -222,6 +222,23 @@ function ptsFor(p,r){
   return s;
 }
 const COLO=m=>m.home==="Colombia"||m.away==="Colombia";
+
+/* --- Apuesta / premios --- */
+function fmtCOP(n){return"$"+Math.round(n||0).toLocaleString("es-CO");}
+function computePot(){
+  const b=S.betting||{};
+  const inscripcion=+b.inscripcion||0;
+  const jugadores=S.roster.length;
+  const total=inscripcion*jugadores;
+  const adminPct=+b.adminPct||0;
+  const adminCut=total*adminPct/100;
+  const distribuible=total-adminCut;
+  const premios=b.premios||{};
+  const p1=distribuible*(+premios.p1||0)/100;
+  const p2=distribuible*(+premios.p2||0)/100;
+  const p3=distribuible*(+premios.p3||0)/100;
+  return{inscripcion,jugadores,total,adminPct,adminCut,distribuible,p1,p2,p3};
+}
 const FD=new Intl.DateTimeFormat("es-CO",{weekday:"short",day:"numeric",month:"short"});
 const FT=new Intl.DateTimeFormat("es-CO",{hour:"numeric",minute:"2-digit",hour12:true});
 function dayKey(ts){return FD.format(ts);}
@@ -259,6 +276,7 @@ function renderShell(){
           <button class="keybtn ${S.organizer?"on":""}" id="orgBtn">🔑 Organizador</button>
         </div>
         <div class="mystats" id="mystats"></div>
+        <div id="pendingBanner"></div>
       </header>
       <div class="tabs" id="tabs">
         <div class="tab" data-v="partidos">Partidos</div>
@@ -305,6 +323,23 @@ function paintMyStats(){
     `<span class="sb" style="color:var(--mint)">✓ <b>${guardados}</b> guardados</span>`;
 }
 
+const URGENTE_MS=3*60*60*1000; // últimas 3h antes del cierre = aviso urgente
+function paintPendingBanner(){
+  const el=document.getElementById("pendingBanner");if(!el)return;
+  if(!S.me){el.innerHTML="";return;}
+  const todayKey=dayKey(S.now);
+  const pendientes=allMatches().filter(m=>dayKey(m.kick)===todayKey && m.kick>S.now && !S.predsMe[m.id]);
+  if(!pendientes.length){el.innerHTML="";return;}
+  const urgente=pendientes.some(m=>m.kick-S.now<=URGENTE_MS);
+  const bg=urgente?"rgba(255,77,109,.14)":"rgba(255,200,69,.10)";
+  const border=urgente?"rgba(255,77,109,.4)":"rgba(255,200,69,.35)";
+  const color=urgente?"var(--flare)":"var(--gold)";
+  el.innerHTML=`<button id="pendingBtn" style="width:100%;text-align:left;background:${bg};border:1px solid ${border};color:${color};border-radius:12px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;margin-top:10px;display:flex;align-items:center;gap:8px">
+    ${urgente?"⏰":"⚠️"} Tienes ${pendientes.length} partido${pendientes.length===1?"":"s"} hoy sin pronóstico ${urgente?"— ¡cierra pronto!":""}
+  </button>`;
+  document.getElementById("pendingBtn").onclick=()=>{S.view="partidos";S.selectedDay=todayKey;renderView();};
+}
+
 let matchEls={};
 function renderView(){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.v===S.view));
@@ -314,7 +349,7 @@ function renderView(){
   else if(S.view==="envivo")renderEnVivo(c);
   else if(S.view==="ranking")renderRanking(c);
   else renderResultados(c);
-  updateSaveBar();tick();paintMyStats();
+  updateSaveBar();tick();paintMyStats();paintPendingBanner();
 }
 
 function tiempoDesde(iso){
@@ -464,7 +499,7 @@ async function savePreds(){
   const ok=await setJSON("preds_"+S.me.id,S.predsMe,true);
   await joinRoster();
   S.allPreds[S.me.id]=Object.assign({},S.predsMe);
-  S.dirty.clear();updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();
+  S.dirty.clear();updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();paintPendingBanner();
   if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión.",true,5000);
   else if(dropped>0)toast(`✅ Guardado. ${dropped} ya cerrado(s).`,false,5000);
   else toast(`✅ ¡${Object.keys(S.predsMe).length} pronósticos guardados!`,false,5000);
@@ -522,7 +557,13 @@ function buildBoard(){
 }
 function renderRanking(c){
   const{board,finished,total}=buildBoard();
-  if(board.length===0){c.innerHTML=`<div class="empty"><span class="big">🏟️</span>Todavía nadie se ha unido.</div>`;return;}
+  const pot=computePot();
+  const premioHtml=pot.total>0?`<div class="rules" style="margin-bottom:14px;border-color:rgba(255,200,69,.35)">
+    <div><b>🏆 Bote total: <span style="color:var(--gold)">${fmtCOP(pot.total)}</span></b> <span style="color:var(--muted);font-size:12px">(${pot.jugadores} jugador${pot.jugadores===1?"":"es"} inscrito${pot.jugadores===1?"":"s"})</span></div>
+    ${pot.adminPct>0?`<div style="margin-top:4px;font-size:12px">Administración: ${fmtCOP(pot.adminCut)} (${pot.adminPct}%) · A repartir: <b style="color:var(--line)">${fmtCOP(pot.distribuible)}</b></div>`:""}
+    <div style="margin-top:8px">🥇 <b style="color:var(--gold)">${fmtCOP(pot.p1)}</b> &nbsp; 🥈 <b style="color:var(--line)">${fmtCOP(pot.p2)}</b> &nbsp; 🥉 <b style="color:var(--line)">${fmtCOP(pot.p3)}</b></div>
+  </div>`:"";
+  if(board.length===0){c.innerHTML=premioHtml+`<div class="empty"><span class="big">🏟️</span>Todavía nadie se ha unido.</div>`;return;}
   let rows="";
   board.forEach((p,i)=>{
     const rank=i+1,mine=S.me&&p.id===S.me.id;
@@ -535,7 +576,7 @@ function renderRanking(c){
       <div class="score"><div class="pp">${p.pts}</div><div class="lbl">pts</div></div>
     </div>`;
   });
-  c.innerHTML=`<div class="lead"><div class="leadhead"><span class="t">Ranking</span><span class="meta">Resultados: ${finished}/${total}</span></div>${rows}</div>`;
+  c.innerHTML=premioHtml+`<div class="lead"><div class="leadhead"><span class="t">Ranking</span><span class="meta">Resultados: ${finished}/${total}</span></div>${rows}</div>`;
 }
 
 async function showGroupEdit(){
@@ -604,6 +645,97 @@ function editTeamName(id,side,current){
   };
 }
 
+/* --- Configuración de premios / inscripción (solo organizador) --- */
+function showBettingConfig(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const b=S.betting||{};
+  const premios=b.premios||{};
+  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+    <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
+    <h2>Premios e inscripción</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto define lo que ve TODO el grupo (monto total y reparto). Quién le paga a quién es cosa tuya — puedes dejar el % de administrador en 0 si cada uno le paga directo al ganador.</p>
+    <label class="field">Monto de inscripción por jugador (COP)</label>
+    <input class="input" id="bc_insc" type="number" min="0" step="1000" value="${b.inscripcion||0}">
+    <label class="field" style="margin-top:12px">% para el administrador</label>
+    <input class="input" id="bc_admin" type="number" min="0" max="100" step="1" value="${b.adminPct||0}">
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 6px">Reparto del resto entre los primeros 3 puestos (en %):</p>
+    <label class="field">🥇 1er puesto</label>
+    <input class="input" id="bc_p1" type="number" min="0" max="100" step="1" value="${premios.p1||0}">
+    <label class="field" style="margin-top:10px">🥈 2do puesto</label>
+    <input class="input" id="bc_p2" type="number" min="0" max="100" step="1" value="${premios.p2||0}">
+    <label class="field" style="margin-top:10px">🥉 3er puesto</label>
+    <input class="input" id="bc_p3" type="number" min="0" max="100" step="1" value="${premios.p3||0}">
+    <div id="bc_preview" style="margin-top:14px;font-size:13px;color:var(--muted);line-height:1.6"></div>
+    <div id="bc_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+    <button class="btn" id="bc_save" style="margin-top:10px">Guardar</button>
+    <button class="btn ghost" id="bc_cancel" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  function updatePreview(){
+    const insc=+document.getElementById("bc_insc").value||0;
+    const adminPct=+document.getElementById("bc_admin").value||0;
+    const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
+    const jugadores=S.roster.length;
+    const total=insc*jugadores;
+    const adminCut=total*adminPct/100;
+    const distribuible=total-adminCut;
+    const pv=document.getElementById("bc_preview");
+    const sumaPremios=p1+p2+p3;
+    pv.innerHTML=`Con <b style="color:var(--line)">${jugadores}</b> jugador(es) registrados: bote total <b style="color:var(--gold)">${fmtCOP(total)}</b> · admin <b style="color:var(--line)">${fmtCOP(adminCut)}</b> · a repartir <b style="color:var(--gold)">${fmtCOP(distribuible)}</b><br>
+      🥇 ${fmtCOP(distribuible*p1/100)} · 🥈 ${fmtCOP(distribuible*p2/100)} · 🥉 ${fmtCOP(distribuible*p3/100)}
+      ${sumaPremios!==100?`<br><span style="color:var(--flare)">⚠️ Los porcentajes de premios suman ${sumaPremios}%, no 100% — puedes dejarlo así si es intencional.</span>`:""}`;
+  }
+  ["bc_insc","bc_admin","bc_p1","bc_p2","bc_p3"].forEach(id=>document.getElementById(id).oninput=updatePreview);
+  updatePreview();
+  document.getElementById("bc_cancel").onclick=()=>ov.remove();
+  document.getElementById("bc_save").onclick=async()=>{
+    const insc=+document.getElementById("bc_insc").value||0;
+    const adminPct=+document.getElementById("bc_admin").value||0;
+    const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
+    const err=document.getElementById("bc_err");
+    if(insc<0||adminPct<0||adminPct>100||p1<0||p2<0||p3<0){err.textContent="Revisa que los valores sean válidos (% entre 0 y 100).";return;}
+    S.betting={inscripcion:insc,adminPct,premios:{p1,p2,p3},pagos:(S.betting&&S.betting.pagos)||{}};
+    await setJSON("betting",S.betting,true);
+    ov.remove();
+    toast("Premios actualizados ✓",false,3000);
+    if(S.view==="ranking")renderRanking(document.getElementById("content"));
+  };
+}
+
+/* --- Estado de pagos por jugador (solo organizador, nadie más lo ve) --- */
+function showPagos(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const pagos=(S.betting&&S.betting.pagos)||{};
+  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+    <div class="kicker" style="color:var(--gold)">Modo Organizador · Privado</div>
+    <h2>Estado de pagos</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Solo tú ves esta lista. Marca a quién ya le recibiste (o confirmó) el pago.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;margin-bottom:16px" id="pagos_list">
+      ${S.roster.map(p=>{
+        const pagado=!!pagos[p.id];
+        return`<div style="display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--faint);border-radius:12px;padding:11px 14px">
+          <span style="font-size:20px">${p.ico||"⚽"}</span><span style="font-weight:700;flex:1">${escapeHtml(p.name)}</span>
+          <button class="pg-toggle" data-id="${p.id}" style="background:${pagado?"var(--mint)":"var(--raise)"};color:${pagado?"#06241d":"var(--muted)"};border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:12px;cursor:pointer">${pagado?"✓ Pagado":"Pendiente"}</button>
+        </div>`;
+      }).join("")}
+    </div>
+    <button class="btn ghost" id="pg_close">Cerrar</button>
+  </div>`;
+  document.getElementById("pg_close").onclick=()=>ov.remove();
+  ov.querySelectorAll(".pg-toggle").forEach(btn=>{
+    btn.onclick=async()=>{
+      const id=btn.dataset.id;
+      S.betting.pagos=S.betting.pagos||{};
+      S.betting.pagos[id]=!S.betting.pagos[id];
+      await setJSON("betting",S.betting,true);
+      showPagos();
+    };
+  });
+}
+
 /* --- Panel de Resultados Simplificado (Sin Formulario de Carga Manual) --- */
 function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
@@ -613,6 +745,8 @@ function renderResultados(c){
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Forzar sincronización ahora</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
+  html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showBettingConfig()" style="background:var(--raise);color:var(--gold)">💰 Configurar premios / inscripción</button></div>`;
+  html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPagos()" style="background:var(--raise);color:var(--gold)">✅ Estado de pagos (solo tú lo ves)</button></div>`;
   
   for(const m of ms){
     const r=S.resWork[m.id]||{},locked=S.now>=m.kick;
@@ -913,6 +1047,7 @@ async function refreshShared(){
     const custom=(await getJSON("custom",true))||[];
     S.roster=roster;S.custom=custom;
     S.live=(await getJSON("live",true))||{};
+    S.betting=(await getJSON("betting",true))||S.betting;
     const resChanged=JSON.stringify(results)!==JSON.stringify(S.results);
     S.results=results;
     const preds={};
@@ -932,7 +1067,7 @@ async function refreshShared(){
       else if(S.view==="envivo")renderEnVivo(document.getElementById("content"));
       else if(S.view==="partidos"&&resChanged)allMatches().forEach(m=>paintFoot(m));
     }
-    paintMyStats();
+    paintMyStats();paintPendingBanner();
   }catch(e){console.error(e);}
 }
 setInterval(refreshShared,25000);
@@ -951,6 +1086,7 @@ window.addEventListener("focus",refreshShared);
     S.groupName=await getJSON("groupName",true);
     S.teamOverrides=(await getJSON("teamOverrides",true))||{};
     S.live=(await getJSON("live",true))||{};
+    S.betting=(await getJSON("betting",true))||{inscripcion:0,adminPct:0,premios:{p1:0,p2:0,p3:0},pagos:{}};
     if(S.me){
       S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};
       // Solo llamamos al backend a "unirse" si hace falta de verdad (jugador nuevo
