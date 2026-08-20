@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Predigoles · Edición Eliminatorias Mundial 2026</title>
+<title>Predigoles · Liga BetPlay II-2026 (FPC)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -132,7 +132,6 @@
   .mystats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .mystats .sb{background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
   .mystats .sb b{color:var(--gold);font-family:var(--score);font-size:16px}
-  /* Estilo personalizado para el combo desplegable del popup */
   .select-popup { width:100%; background:#06120d; border:1px solid var(--faint); border-radius:12px; color:var(--line); font:600 15px var(--body); padding:13px; outline:none; margin-bottom:15px; }
   .select-popup:focus { border-color:var(--mint); }
 </style>
@@ -144,37 +143,45 @@
 <script>
 const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KSrvVowdHXk7bi5ldBeqcR0_ELzhhhwBsnLOhUTkUlgZkct/exec";
 
-/* --- Multi-tenant inteligente con soporte para ?grupo= o el viejo ?tab= --- */
+/* --- Multi-tenant con soporte para ?grupo= o ?tab= --- */
 const _qp=new URLSearchParams(location.search);
-const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"kv1").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"kv1";
+const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"fpc2026").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"fpc2026";
 localStorage.setItem("pg_tab",TAB);
 
+/* --- Fixture Liga BetPlay II-2026 --- */
 const RAW=[
-["o1","Octavos","2026-07-04T16:00:00-05:00","Paraguay","Francia","Estadio Filadelfia, Filadelfia"],
-["o2","Octavos","2026-07-04T12:00:00-05:00","Canadá","Marruecos","Houston"],
-["o3","Octavos","2026-07-05T15:00:00-05:00","Brasil","Noruega","Estadio NY, NJ, East Rutherford"],
-["o4","Octavos","2026-07-05T19:00:00-05:00","México","Inglaterra","Estadio Azteca, CDMX"],
-["o5","Octavos","2026-07-06T14:00:00-05:00","Portugal","España","Estadio Dallas, Arlington"],
-["o6","Octavos","2026-07-06T19:00:00-05:00","Estados Unidos","Bélgica","Estadio Seattle, Seattle"],
-["o7","Octavos","2026-07-07T11:00:00-05:00","Argentina","Egipto","Mercedes-Benz Stadium, Atlanta"],
-["o8","Octavos","2026-07-07T15:00:00-05:00","Suiza","Colombia","Estadio BC Place, Vancouver"],
-["q1","Cuartos","2026-07-09T15:00:00-05:00","Francia","Marruecos","Gillette Stadium, Boston"],
-["q2","Cuartos","2026-07-10T14:00:00-05:00","España","Bélgica","Arrowhead Stadium, Kansas City"],
-["q3","Cuartos","2026-07-11T16:00:00-05:00","Noruega","Inglaterra","NRG Stadium, Houston"],
-["q4","Cuartos","2026-07-11T20:00:00-05:00","Argentina","Suiza","Levi's Stadium, San Francisco"],
-["s1","Semifinal","2026-07-14T14:00:00-05:00","Francia","España","AT&T Stadium, Dallas"],
-["s2","Semifinal","2026-07-15T14:00:00-05:00","Inglaterra","Argentina","Mercedes-Benz Stadium, Atlanta"],
-["tp","Tercer puesto","2026-07-18T16:00:00-05:00","Perdedor S1","Perdedor S2","Hard Rock Stadium, Miami"],
-["fn","Final","2026-07-19T14:00:00-05:00","Ganador S1","Ganador S2","MetLife Stadium, NY/NJ"],
+["j1","Fecha 1","2026-08-21T18:00:00-05:00","Millonarios","Atlético Nacional","Estadio El Campín, Bogotá"],
+["j2","Fecha 1","2026-08-21T20:10:00-05:00","América de Cali","Junior","Estadio Pascual Guerrero, Cali"],
+["j3","Fecha 1","2026-08-22T16:00:00-05:00","Independiente Medellín","Santa Fe","Estadio Atanasio Girardot, Medellín"],
+["j4","Fecha 1","2026-08-22T18:10:00-05:00","Deportivo Cali","Bucaramanga","Estadio Deportivo Cali, Palmira"],
+["j5","Fecha 1","2026-08-22T20:20:00-05:00","Once Caldas","Tolima","Estadio Palogrande, Manizales"],
+["j6","Fecha 2","2026-08-28T18:00:00-05:00","Atlético Nacional","América de Cali","Estadio Atanasio Girardot, Medellín"],
+["j7","Fecha 2","2026-08-28T20:10:00-05:00","Junior","Millonarios","Estadio Metropolitano, Barranquilla"],
+["j8","Fecha 2","2026-08-29T16:00:00-05:00","Santa Fe","Deportivo Cali","Estadio El Campín, Bogotá"],
+["j9","Fecha 2","2026-08-29T18:10:00-05:00","Tolima","Independiente Medellín","Estadio Manuel Murillo Toro, Ibagué"],
+["j10","Fecha 2","2026-08-29T20:20:00-05:00","Bucaramanga","Once Caldas","Estadio Américo Montanini, Bucaramanga"],
+["q1","Cuadrangulares","2026-11-15T17:00:00-05:00","Por definir (A1)","Por definir (A2)","Estadio Local"],
+["q2","Cuadrangulares","2026-11-15T19:15:00-05:00","Por definir (B1)","Por definir (B2)","Estadio Local"],
+["fn1","Final Ida","2026-12-06T18:00:00-05:00","Ganador Grupo A","Ganador Grupo B","Estadio Finalista 1"],
+["fn2","Final Vuelta","2026-12-13T18:00:00-05:00","Ganador Grupo B","Ganador Grupo A","Estadio Finalista 2"],
 ];
-const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),venue:r[5]||"Estadio de la Fase",custom:false}));
-const FLAG={"México":"🇲🇽","Sudáfrica":"🇿🇦","Corea del Sur":"🇰🇷","Chequia":"🇨🇿","Canadá":"🇨🇦","Bosnia y Herzegovina":"🇧🇦","Estados Unidos":"🇺🇸","Paraguay":"🇵🇾","Catar":"🇶🇦","Suiza":"🇨🇭","Brasil":"🇧🇷","Marruecos":"🇲🇦","Haití":"🇭🇹","Escocia":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Australia":"🇦🇺","Turquía":"🇹🇷","Alemania":"🇩🇪","Curazao":"🇨🇼","Países Bajos":"🇳🇱","Japón":"🇯🇵","Costa de Marfil":"🇨🇮","Ecuador":"🇪🇨","Suecia":"🇸🇪","Túnez":"🇹🇳","España":"🇪🇸","Cabo Verde":"🇨🇻","Bélgica":"🇧🇪","Egipto":"🇪🇬","Arabia Saudita":"🇸🇦","Uruguay":"🇺🇾","Irán":"🇮🇷","Nueva Zelanda":"🇳🇿","Francia":"🇫🇷","Senegal":"🇸🇳","Irak":"🇮🇶","Noruega":"🇳🇴","Argentina":"🇦🇷","Argelia":"🇩🇿","Austria":"🇦🇹","Jordania":"🇯🇴","Portugal":"🇵🇹","RD Congo":"🇨🇩","Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia":"🇭🇷","Ghana":"🇬🇭","Panamá":"🇵🇦","Uzbekistán":"🇺🇿","Colombia":"🇨🇴"};
+
+const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),venue:r[5]||"Estadio FPC",custom:false}));
+
+/* --- Banderas / Escudos Equipos FPC --- */
+const FLAG={
+  "Atlético Nacional":"🟢", "Millonarios":"🔵", "América de Cali":"🔴", "Santa Fe":"🦁", 
+  "Junior":"🦈", "Independiente Medellín":"🔴", "Deportivo Cali":"🟢", "Once Caldas":"⚪", 
+  "Tolima":"🟡", "Bucaramanga":"🟡", "Pereira":"🟡", "La Equidad":"🟢", 
+  "Envigado":"🟠", "Pasto":"🔴", "Águilas Doradas":"🦅", "Jaguarés":"🐆", 
+  "Alianza FC":"🔵", "Boyacá Chicó":"🟢", "Patriotas":"🔴", "Fortaleza":"🏰"
+};
 const flag=n=>FLAG[n]||"⚽";
 
 const ALLOWED_TEAMS=Object.keys(FLAG).concat([
-  "Ganador O1","Ganador O2","Ganador O3","Ganador O4","Ganador O5","Ganador O6","Ganador O7","Ganador O8",
-  "Ganador C1","Ganador C2","Ganador C3","Ganador C4","Ganador S1","Ganador S2","Perdedor S1","Perdedor S2",
-  "Por definir (Arg./Cabo Verde)","Por definir (Col./Ghana)"
+  "Por definir (A1)","Por definir (A2)","Por definir (A3)","Por definir (A4)",
+  "Por definir (B1)","Por definir (B2)","Por definir (B3)","Por definir (B4)",
+  "Ganador Grupo A","Ganador Grupo B"
 ]).sort();
 
 /* --- Storage --- */
@@ -205,7 +212,7 @@ const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","
 let pendingIco=AVATARS[0];
 
 function allMatches(){
-  const cm=S.custom.map(c=>({id:c.id,g:c.g||"ELIM",home:c.home,away:c.away,kick:c.kick,venue:c.venue||"Estadio Asignado",custom:true}));
+  const cm=S.custom.map(c=>({id:c.id,g:c.g||"FPC",home:c.home,away:c.away,kick:c.kick,venue:c.venue||"Estadio Asignado",custom:true}));
   const all=FIXTURE.map(m=>({...m})).concat(cm);
   for(const m of all){
     const ov=S.teamOverrides[m.id];
@@ -221,7 +228,7 @@ function ptsFor(p,r){
   if(+p.h===+r.h&&+p.a===+r.a)s+=2;
   return s;
 }
-const COLO=m=>m.home==="Colombia"||m.away==="Colombia";
+const COLO=m=>false; // Sin resaltado especial para selección nacional
 
 /* --- Apuesta / premios --- */
 function fmtCOP(n){return"$"+Math.round(n||0).toLocaleString("es-CO");}
@@ -267,9 +274,9 @@ function renderShell(){
   root.innerHTML=`
     <div class="topfijo">
       <header>
-        <div class="kicker">Predigoles · ${S.groupName?escapeHtml(S.groupName):"Edición Eliminatorias"} · Hora local</div>
-        <h1>Rumbo a la <span class="yr">Final</span></h1>
-        <div class="sub">Acierta el resultado y clava el marcador. Que gane el más mundialista del grupo.</div>
+        <div class="kicker">Predigoles · ${S.groupName?escapeHtml(S.groupName):"Liga BetPlay II-2026"} · Hora local</div>
+        <h1>Rumbo al <span class="yr">Título</span></h1>
+        <div class="sub">Acierta el resultado y clava el marcador. Demuestra quién sabe más del FPC.</div>
         <div class="whoami">
           <span class="chip"><span class="dot"></span> Juegas como <b>${me?escapeHtml(me.ico+" "+me.name):"—"}</b></span>
           <button class="link-btn" id="changeName">cambiar</button>
@@ -323,7 +330,7 @@ function paintMyStats(){
     `<span class="sb" style="color:var(--mint)">✓ <b>${guardados}</b> guardados</span>`;
 }
 
-const URGENTE_MS=3*60*60*1000; // últimas 3h antes del cierre = aviso urgente
+const URGENTE_MS=3*60*60*1000;
 function paintPendingBanner(){
   const el=document.getElementById("pendingBanner");if(!el)return;
   if(!S.me){el.innerHTML="";return;}
@@ -364,7 +371,6 @@ function matchCardHtml(m){
   const p=S.predsMe[m.id]||{};
   const res=S.results[m.id];
   const live=!res?S.live[m.id]:null;
-  const colo=COLO(m);
   const ph=(p.h!=null?p.h:""),pa=(p.a!=null?p.a:"");
   const rh=res?res.h:(live?live.h:"–"),ra=res?res.a:(live?live.a:"–");
   const homeWin=res&&+res.h>+res.a,awayWin=res&&+res.a>+res.h;
@@ -374,9 +380,9 @@ function matchCardHtml(m){
   const whenInner=live
     ?`<span class="cd soon">🔴 ${live.minute!=null?live.minute+"'":"EN VIVO"} · ${tiempoDesde(live.syncedAt)}</span>`
     :`<span class="cd" id="cd_${m.id}"></span>`;
-  return`<div class="match ${colo?"col":""}" id="card_${m.id}">
+  return`<div class="match" id="card_${m.id}">
     <div class="mtop">
-      <span class="grp ${colo?"colrib":""}">${colo?"¡Juega Colombia! 🇨🇴":m.g}</span>
+      <span class="grp">${m.g}</span>
       <span class="when">${whenHtml(m.kick)}${whenInner}</span>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:4px;">📍 ${escapeHtml(m.venue)}</div>
@@ -505,10 +511,10 @@ async function savePreds(){
   else toast(`✅ ¡${Object.keys(S.predsMe).length} pronósticos guardados!`,false,5000);
 }
 
-/* --- En Vivo: pronósticos del partido que está jugándose ahora --- */
+/* --- En Vivo --- */
 function renderEnVivo(c){
   const now=S.now;
-  const DURACION_MAX=3*60*60*1000; // 3h cubre 90' + entretiempo + prórroga + penales
+  const DURACION_MAX=3*60*60*1000;
   const activos=allMatches().filter(m=>m.kick<=now && !S.results[m.id] && (now-m.kick)<DURACION_MAX);
 
   if(!activos.length){
@@ -518,12 +524,11 @@ function renderEnVivo(c){
 
   let html="";
   activos.forEach(m=>{
-    const colo=COLO(m);
     const live=S.live[m.id];
     const detalle=live?`🔴 ${live.minute!=null?live.minute+"'":"EN VIVO"} · actualizado ${tiempoDesde(live.syncedAt)}`:"🔴 EN JUEGO · esperando marcador";
-    html+=`<div class="match ${colo?"col":""}" style="padding:14px 14px 12px">
+    html+=`<div class="match" style="padding:14px 14px 12px">
       <div class="mtop">
-        <span class="grp ${colo?"colrib":""}">${colo?"¡Juega Colombia! 🇨🇴":m.g}</span>
+        <span class="grp">${m.g}</span>
         <span class="when" style="color:var(--flare);font-weight:700">${detalle}</span>
       </div>
       <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span>${live?`<span style="font-family:var(--score);font-size:22px;color:var(--flare);margin-left:auto">${live.h}</span>`:""}</div>
@@ -615,7 +620,7 @@ async function showGroupEdit(){
   };
 }
 
-/* --- Pop-up Flotante Pro con Lista Desplegable (<select>) --- */
+/* --- Selección de Clasificados FPC --- */
 function editTeamName(id,side,current){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
@@ -624,9 +629,9 @@ function editTeamName(id,side,current){
   let optionsHtml=ALLOWED_TEAMS.map(team=>`<option value="${team}" ${team===current?"selected":""}>${team}</option>`).join("");
   
   ov.innerHTML=`<div class="card">
-    <div class="kicker" style="color:var(--gold)">Asignación de Clasificados</div>
+    <div class="kicker" style="color:var(--gold)">Asignación de Clasificados FPC</div>
     <h2>Definir Equipo</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Selecciona la selección oficial que ocupará este lugar:</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Selecciona el club clasificado para esta llave:</p>
     <label class="field">Equipo ${side==="home"?"Local":"Visitante"}</label>
     <select class="select-popup" id="popup_select_team">${optionsHtml}</select>
     <button class="btn" id="popup_save_team">Confirmar Cambio</button>
@@ -640,12 +645,12 @@ function editTeamName(id,side,current){
     S.teamOverrides[id][side]=name;
     await setJSON("teamOverrides",S.teamOverrides,true);
     ov.remove();
-    toast("Nombre oficial actualizado ✓",false,2500);
+    toast("Equipo actualizado ✓",false,2500);
     renderResultados(document.getElementById("content"));
   };
 }
 
-/* --- Configuración de premios / inscripción (solo organizador) --- */
+/* --- Configuración de premios --- */
 function showBettingConfig(){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
@@ -655,12 +660,12 @@ function showBettingConfig(){
   ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
     <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
     <h2>Premios e inscripción</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto define lo que ve TODO el grupo (monto total y reparto). Quién le paga a quién es cosa tuya — puedes dejar el % de administrador en 0 si cada uno le paga directo al ganador.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto define lo que ve TODO el grupo (monto total y reparto).</p>
     <label class="field">Monto de inscripción por jugador (COP)</label>
     <input class="input" id="bc_insc" type="number" min="0" step="1000" value="${b.inscripcion||0}">
     <label class="field" style="margin-top:12px">% para el administrador</label>
     <input class="input" id="bc_admin" type="number" min="0" max="100" step="1" value="${b.adminPct||0}">
-    <p style="color:var(--muted);font-size:12px;margin:14px 0 6px">Reparto del resto entre los primeros 3 puestos (en %):</p>
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 6px">Reparto entre los primeros 3 puestos (%):</p>
     <label class="field">🥇 1er puesto</label>
     <input class="input" id="bc_p1" type="number" min="0" max="100" step="1" value="${premios.p1||0}">
     <label class="field" style="margin-top:10px">🥈 2do puesto</label>
@@ -684,7 +689,7 @@ function showBettingConfig(){
     const sumaPremios=p1+p2+p3;
     pv.innerHTML=`Con <b style="color:var(--line)">${jugadores}</b> jugador(es) registrados: bote total <b style="color:var(--gold)">${fmtCOP(total)}</b> · admin <b style="color:var(--line)">${fmtCOP(adminCut)}</b> · a repartir <b style="color:var(--gold)">${fmtCOP(distribuible)}</b><br>
       🥇 ${fmtCOP(distribuible*p1/100)} · 🥈 ${fmtCOP(distribuible*p2/100)} · 🥉 ${fmtCOP(distribuible*p3/100)}
-      ${sumaPremios!==100?`<br><span style="color:var(--flare)">⚠️ Los porcentajes de premios suman ${sumaPremios}%, no 100% — puedes dejarlo así si es intencional.</span>`:""}`;
+      ${sumaPremios!==100?`<br><span style="color:var(--flare)">⚠️ Los porcentajes suman ${sumaPremios}%, no 100%.</span>`:""}`;
   }
   ["bc_insc","bc_admin","bc_p1","bc_p2","bc_p3"].forEach(id=>document.getElementById(id).oninput=updatePreview);
   updatePreview();
@@ -694,7 +699,7 @@ function showBettingConfig(){
     const adminPct=+document.getElementById("bc_admin").value||0;
     const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
     const err=document.getElementById("bc_err");
-    if(insc<0||adminPct<0||adminPct>100||p1<0||p2<0||p3<0){err.textContent="Revisa que los valores sean válidos (% entre 0 y 100).";return;}
+    if(insc<0||adminPct<0||adminPct>100||p1<0||p2<0||p3<0){err.textContent="Valores no válidos.";return;}
     S.betting={inscripcion:insc,adminPct,premios:{p1,p2,p3},pagos:(S.betting&&S.betting.pagos)||{}};
     await setJSON("betting",S.betting,true);
     ov.remove();
@@ -703,7 +708,7 @@ function showBettingConfig(){
   };
 }
 
-/* --- Estado de pagos por jugador (solo organizador, nadie más lo ve) --- */
+/* --- Estado de pagos --- */
 function showPagos(){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
@@ -712,7 +717,7 @@ function showPagos(){
   ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
     <div class="kicker" style="color:var(--gold)">Modo Organizador · Privado</div>
     <h2>Estado de pagos</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Solo tú ves esta lista. Marca a quién ya le recibiste (o confirmó) el pago.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Solo tú ves esta lista.</p>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;margin-bottom:16px" id="pagos_list">
       ${S.roster.map(p=>{
         const pagado=!!pagos[p.id];
@@ -736,14 +741,13 @@ function showPagos(){
   });
 }
 
-/* --- Panel de Resultados Simplificado (Sin Formulario de Carga Manual) --- */
+/* --- Panel de Resultados --- */
 function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
   const ms=allMatches().slice().sort((a,b)=>b.kick-a.kick);
   
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID de este grupo: <b style="color:var(--gold)">${TAB}</b> · Configura los cruces de las fases finales usando el botón ✏️ o gestiona el grupo.</div>`;
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo FPC: <b style="color:var(--gold)">${TAB}</b> · Configura los clasificados usando ✏️ e ingresa marcadores.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
-  html+=`<div class="addbox" style="border-color:var(--mint);margin-bottom:15px"><button class="smallbtn full" onclick="forzarSincronizacionAPI()" style="background:#36e0bf;color:#06241d;font-weight:700;">🔄 Forzar sincronización ahora</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showBettingConfig()" style="background:var(--raise);color:var(--gold)">💰 Configurar premios / inscripción</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPagos()" style="background:var(--raise);color:var(--gold)">✅ Estado de pagos (solo tú lo ves)</button></div>`;
@@ -787,19 +791,18 @@ async function saveResultsBatch(){
   if(S.view==="ranking")renderRanking(document.getElementById("content"));
 }
 
-/* --- Configuración inicial del grupo (pantalla verde obligatoria en momento cero) --- */
+/* --- Setup inicial --- */
 function showGroupSetup(onDone){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
   ov.innerHTML=`<div class="card" style="border-color:var(--mint);box-shadow:0 0 30px rgba(54,224,191,.15)">
     <div class="kicker" style="color:var(--mint)">Configuración Inicial</div>
-    <h2>Crea tu polla</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Eres la primera persona en abrir este link. Configura tu grupo antes de invitar a los demás — esto solo se pide una vez.</p>
-    <label class="field">Nombre de tu grupo/polla</label>
-    <input class="input" id="gn_in" maxlength="30" placeholder="Ej: Familia Pérez, Amigos del Fútbol...">
+    <h2>Crea tu polla FPC</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Configura el grupo antes de invitar a los demás.</p>
+    <label class="field">Nombre de la polla</label>
+    <input class="input" id="gn_in" maxlength="30" placeholder="Ej: Polla Futbolera FPC...">
     <label class="field" style="margin-top:14px">PIN de administrador (4 dígitos)</label>
-    <p style="color:var(--muted);font-size:12px;margin:0 0 6px">Lo usarás para entrar al panel de organizador y cargar resultados. Guárdalo bien.</p>
     <input class="input" id="ap1_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
     <label class="field" style="margin-top:10px">Confirma el PIN</label>
     <input class="input" id="ap2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
@@ -810,20 +813,20 @@ function showGroupSetup(onDone){
     const name=document.getElementById("gn_in").value.trim();
     const p1=document.getElementById("ap1_in").value.trim(),p2=document.getElementById("ap2_in").value.trim();
     const err=document.getElementById("gs_err");
-    if(!name){err.textContent="Escribe el nombre de tu grupo.";return;}
-    if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="El PIN debe tener 4 dígitos numéricos.";return;}
+    if(!name){err.textContent="Escribe el nombre del grupo.";return;}
+    if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="PIN de 4 dígitos.";return;}
     if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
     document.getElementById("gs_save").disabled=true;
     await setJSON("groupName",name,true);
     await setJSON("adminPin",_hashPin(p1),true);
     S.groupName=name;
     ov.remove();
-    toast(`Grupo "${name}" creado ✓ Guarda tu PIN.`,false,5000);
+    toast(`Grupo "${name}" creado ✓`,false,5000);
     if(onDone)onDone();
   };
 }
 
-/* --- Login con lista + PIN --- */
+/* --- Onboarding --- */
 async function showOnboarding(isChange){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
@@ -833,10 +836,9 @@ async function showOnboarding(isChange){
   function renderSelectScreen(){
     pendingIco=AVATARS[0];
     ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
-      <div class="kicker" style="color:var(--mint)">Bienvenido a la polla</div>
+      <div class="kicker" style="color:var(--mint)">Bienvenido a la polla FPC</div>
       <h2>¿Quién juega?</h2>
       ${roster.length>0?`
-        <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Selecciona tu nombre o regístrate si eres nuevo.</p>
         <input class="input" id="search_in" placeholder="🔍 Buscar jugador..." style="margin-bottom:10px">
         <div id="player_list" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;margin-bottom:14px"></div>
         <div style="height:1px;background:var(--faint);margin:10px 0"></div>
@@ -881,7 +883,7 @@ async function showOnboarding(isChange){
       if(pin.length<4){document.getElementById("pin_err").textContent="El PIN debe tener 4 dígitos.";return;}
       const storedHash=await getJSON("pin_"+player.id,true);
       if(!storedHash){await _loginPlayer(player,pin,true);return;}
-      if(_hashPin(pin)!==storedHash){document.getElementById("pin_err").textContent="PIN incorrecto. Intenta de nuevo.";pi.value="";pi.focus();return;}
+      if(_hashPin(pin)!==storedHash){document.getElementById("pin_err").textContent="PIN incorrecto.";pi.value="";pi.focus();return;}
       await _loginPlayer(player,pin,false);
     }
     document.getElementById("enterBtn").onclick=tryLogin;
@@ -889,8 +891,7 @@ async function showOnboarding(isChange){
     document.getElementById("forgotBtn").onclick=()=>{
       ov.innerHTML=`<div class="card">
         <h2 style="font-size:20px">PIN olvidado</h2>
-        <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Contacta al organizador de la polla para que resetee tu PIN.</p>
-        <p style="color:var(--muted);font-size:13px">Jugador: <b style="color:var(--line)">${escapeHtml(player.name)}</b></p>
+        <p style="color:var(--muted);font-size:13px">Contacta al organizador para resetearlo.</p>
         <button class="btn ghost" id="backBtn2" style="margin-top:16px">← Volver</button>
       </div>`;
       document.getElementById("backBtn2").onclick=()=>renderPinScreen(player);
@@ -904,16 +905,13 @@ async function showOnboarding(isChange){
       <div class="kicker" style="color:var(--mint)">Nuevo jugador</div>
       <h2>Crea tu perfil</h2>
       <label class="field">Tu nombre</label>
-      <input class="input" id="nm_in" maxlength="20" placeholder="Ej: Martín">
+      <input class="input" id="nm_in" maxlength="20" placeholder="Ej: Carlos">
       <div class="avatars" id="avs" style="margin:14px 0 16px"></div>
       <label class="field">PIN de 4 dígitos</label>
       <input class="input" id="pin1_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
       <label class="field" style="margin-top:10px">Confirma tu PIN</label>
       <input class="input" id="pin2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
       <div id="reg_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
-      <div style="background:rgba(54,224,191,.08);border:1px solid rgba(54,224,191,.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);margin:10px 0 16px">
-        💡 <b style="color:var(--line)">Guarda tu PIN</b> — lo necesitarás cada vez que entres, incluso desde otro celular.
-      </div>
       <button class="btn" id="regBtn">Registrarme y entrar</button>
     </div>`;
     document.getElementById("backBtn").onclick=renderSelectScreen;
@@ -931,11 +929,9 @@ async function showOnboarding(isChange){
       const err=document.getElementById("reg_err");
       const btn=document.getElementById("regBtn");
       if(!name){inp.focus();inp.style.borderColor="var(--flare)";err.textContent="Escribe tu nombre.";return;}
-      if(pin1.length<4){err.textContent="El PIN debe tener 4 dígitos.";return;}
+      if(pin1.length<4){err.textContent="PIN de 4 dígitos.";return;}
       if(pin1!==pin2){err.textContent="Los PINes no coinciden.";return;}
-      // Chequeo rápido local (feedback inmediato); la verificación real y a prueba de
-      // condiciones de carrera ocurre en el servidor al llamar joinRoster() abajo.
-      if(roster.find(p=>p.name.toLowerCase()===name.toLowerCase())){err.textContent="Ya existe ese nombre. ¿Eres tú? Selecciónate de la lista.";return;}
+      if(roster.find(p=>p.name.toLowerCase()===name.toLowerCase())){err.textContent="Ese nombre ya existe.";return;}
       btn.disabled=true;
       const newId="p_"+Math.random().toString(36).slice(2,9);
       S.me={id:newId,name,ico:pendingIco};
@@ -944,12 +940,12 @@ async function showOnboarding(isChange){
       const r=await joinRoster();
       if(r&&r.status==="name_taken"){
         btn.disabled=false;
-        err.textContent="Ese nombre ya lo tomó alguien más justo ahora. ¿Eres tú? Vuelve y selecciónate de la lista.";
+        err.textContent="Nombre ocupado justo ahora.";
         S.me=null;await setJSON("me",null,false);
         return;
       }
       ov.remove();renderShell();renderView();
-      toast(`¡Bienvenido ${name}! Guarda tu PIN.`,false,5000);
+      toast(`¡Bienvenido ${name}!`,false,5000);
     };
   }
 
@@ -958,13 +954,12 @@ async function showOnboarding(isChange){
     await setJSON("me",S.me,false);
     if(isFirstTime){
       await setJSON("pin_"+player.id,_hashPin(pin),true);
-      toast(`¡Hola ${player.name}! PIN creado. Recuérdalo.`,false,5000);
     }
     await _migrarPronosticos(player.id);
     S.predsMe=(await getJSON("preds_"+player.id,true))||{};
     await joinRoster();
     ov.remove();renderShell();renderView();
-    if(!isFirstTime)toast(`¡Bienvenido de vuelta, ${player.name}!`,false,3000);
+    if(!isFirstTime)toast(`¡Hola ${player.name}!`,false,3000);
   }
 
   if(isChange&&S.me){
@@ -980,7 +975,7 @@ async function joinRoster(){
     S.roster=r.roster;
     CACHE["roster"]=JSON.stringify(r.roster);
   } else if(!(r&&r.status==="name_taken")&&!S.roster.some(p=>p.id===S.me.id)){
-    S.roster.push(S.me); // fallback local si falla la red — se reintentará en el próximo refreshShared()
+    S.roster.push(S.me);
   }
   return r;
 }
@@ -1006,7 +1001,7 @@ async function showPinReset(){
   ov.innerHTML=`<div class="card">
     <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
     <h2>Resetear PIN</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Selecciona el jugador cuyo PIN quieres resetear.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Selecciona el jugador.</p>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:16px">
       ${roster.map(p=>`<button class="pr-row" data-id="${p.id}" style="display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--faint);border-radius:12px;padding:11px 14px;cursor:pointer;color:var(--line);font:inherit;text-align:left">
         <span style="font-size:20px">${p.ico||"⚽"}</span><span style="font-weight:700;flex:1">${escapeHtml(p.name)}</span><span style="color:var(--flare);font-size:12px">Resetear →</span></button>`).join("")}
@@ -1089,15 +1084,12 @@ window.addEventListener("focus",refreshShared);
     S.betting=(await getJSON("betting",true))||{inscripcion:0,adminPct:0,premios:{p1:0,p2:0,p3:0},pagos:{}};
     if(S.me){
       S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};
-      // Solo llamamos al backend a "unirse" si hace falta de verdad (jugador nuevo
-      // o cambió nombre/avatar) — si ya está igual en el roster, nos ahorramos el viaje de red.
       const yaEnRoster=S.roster.some(p=>p.id===S.me.id&&p.name===S.me.name&&p.ico===S.me.ico);
       if(!yaEnRoster)await joinRoster();
     }
     for(const pl of S.roster)S.allPreds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
     if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
     
-    // Si no hay un nombre de grupo creado en esta pestaña (Momento Cero), forzar configuración verde
     if(!S.groupName){
       showGroupSetup(()=>{
         renderShell();
@@ -1111,20 +1103,4 @@ window.addEventListener("focus",refreshShared);
     if(!S.me)showOnboarding(false);
   }catch(e){console.error("Boot error:",e);renderShell();renderView();}
 })();
-
-function forzarSincronizacionAPI(){
-  toast("Consultando resultados en vivo...");
-  cloudCall({action:"syncNow"}).then(async (r)=>{
-    if(r&&r.status==="success"){
-      toast(`✅ ${r.sincronizados} partido(s) actualizado(s)`,false,3500);
-    } else {
-      toast("No se pudo sincronizar. Intenta de nuevo.",true,3500);
-    }
-    await refreshShared();
-    if(S.view==="resultados")renderResultados(document.getElementById("content"));
-    else if(S.view==="ranking")renderRanking(document.getElementById("content"));
-    else if(S.view==="envivo")renderEnVivo(document.getElementById("content"));
-    else if(S.view==="partidos")allMatches().forEach(m=>paintFoot(m));
-  });
-}
 </script>
