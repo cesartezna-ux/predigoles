@@ -148,22 +148,73 @@ const _qp=new URLSearchParams(location.search);
 const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"fpc2026").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"fpc2026";
 localStorage.setItem("pg_tab",TAB);
 
-/* --- Fixture Liga BetPlay II-2026 --- */
+/* --- Fixture Liga BetPlay II-2026 (Todos contra Todos Completo + Fases Finales) --- */
 const RAW=[
-["j1","Fecha 1","2026-08-21T18:00:00-05:00","Millonarios","Atlético Nacional","Estadio El Campín, Bogotá"],
-["j2","Fecha 1","2026-08-21T20:10:00-05:00","América de Cali","Junior","Estadio Pascual Guerrero, Cali"],
-["j3","Fecha 1","2026-08-22T16:00:00-05:00","Independiente Medellín","Santa Fe","Estadio Atanasio Girardot, Medellín"],
-["j4","Fecha 1","2026-08-22T18:10:00-05:00","Deportivo Cali","Bucaramanga","Estadio Deportivo Cali, Palmira"],
-["j5","Fecha 1","2026-08-22T20:20:00-05:00","Once Caldas","Tolima","Estadio Palogrande, Manizales"],
-["j6","Fecha 2","2026-08-28T18:00:00-05:00","Atlético Nacional","América de Cali","Estadio Atanasio Girardot, Medellín"],
-["j7","Fecha 2","2026-08-28T20:10:00-05:00","Junior","Millonarios","Estadio Metropolitano, Barranquilla"],
-["j8","Fecha 2","2026-08-29T16:00:00-05:00","Santa Fe","Deportivo Cali","Estadio El Campín, Bogotá"],
-["j9","Fecha 2","2026-08-29T18:10:00-05:00","Tolima","Independiente Medellín","Estadio Manuel Murillo Toro, Ibagué"],
-["j10","Fecha 2","2026-08-29T20:20:00-05:00","Bucaramanga","Once Caldas","Estadio Américo Montanini, Bucaramanga"],
-["q1","Cuadrangulares","2026-11-15T17:00:00-05:00","Por definir (A1)","Por definir (A2)","Estadio Local"],
-["q2","Cuadrangulares","2026-11-15T19:15:00-05:00","Por definir (B1)","Por definir (B2)","Estadio Local"],
-["fn1","Final Ida","2026-12-06T18:00:00-05:00","Ganador Grupo A","Ganador Grupo B","Estadio Finalista 1"],
-["fn2","Final Vuelta","2026-12-13T18:00:00-05:00","Ganador Grupo B","Ganador Grupo A","Estadio Finalista 2"],
+// FECHA 1
+["f1_1","Fecha 1","2026-08-21T18:00:00-05:00","Millonarios","Atlético Nacional","Estadio El Campín, Bogotá"],
+["f1_2","Fecha 1","2026-08-21T20:10:00-05:00","América de Cali","Junior","Estadio Pascual Guerrero, Cali"],
+["f1_3","Fecha 1","2026-08-22T16:00:00-05:00","Independiente Medellín","Santa Fe","Estadio Atanasio Girardot, Medellín"],
+["f1_4","Fecha 1","2026-08-22T18:10:00-05:00","Deportivo Cali","Bucaramanga","Estadio Deportivo Cali, Palmira"],
+["f1_5","Fecha 1","2026-08-22T20:20:00-05:00","Once Caldas","Tolima","Estadio Palogrande, Manizales"],
+// FECHA 2
+["f2_1","Fecha 2","2026-08-28T18:00:00-05:00","Atlético Nacional","América de Cali","Estadio Atanasio Girardot, Medellín"],
+["f2_2","Fecha 2","2026-08-28T20:10:00-05:00","Junior","Millonarios","Estadio Metropolitano, Barranquilla"],
+["f2_3","Fecha 2","2026-08-29T16:00:00-05:00","Santa Fe","Deportivo Cali","Estadio El Campín, Bogotá"],
+["f2_4","Fecha 2","2026-08-29T18:10:00-05:00","Tolima","Independiente Medellín","Estadio Manuel Murillo Toro, Ibagué"],
+["f2_5","Fecha 2","2026-08-29T20:20:00-05:00","Bucaramanga","Once Caldas","Estadio Américo Montanini, Bucaramanga"],
+// FECHA 3
+["f3_1","Fecha 3","2026-09-04T18:00:00-05:00","Millonarios","Santa Fe","Estadio El Campín, Bogotá"],
+["f3_2","Fecha 3","2026-09-04T20:10:00-05:00","América de Cali","Deportivo Cali","Estadio Pascual Guerrero, Cali"],
+["f3_3","Fecha 3","2026-09-05T16:00:00-05:00","Atlético Nacional","Independiente Medellín","Estadio Atanasio Girardot, Medellín"],
+["f3_4","Fecha 3","2026-09-05T18:10:00-05:00","Junior","Once Caldas","Estadio Metropolitano, Barranquilla"],
+["f3_5","Fecha 3","2026-09-05T20:20:00-05:00","Bucaramanga","Tolima","Estadio Américo Montanini, Bucaramanga"],
+// FECHA 4
+["f4_1","Fecha 4","2026-09-11T18:00:00-05:00","Santa Fe","América de Cali","Estadio El Campín, Bogotá"],
+["f4_2","Fecha 4","2026-09-11T20:10:00-05:00","Deportivo Cali","Millonarios","Estadio Deportivo Cali, Palmira"],
+["f4_3","Fecha 4","2026-09-12T16:00:00-05:00","Independiente Medellín","Junior","Estadio Atanasio Girardot, Medellín"],
+["f4_4","Fecha 4","2026-09-12T18:10:00-05:00","Tolima","Atlético Nacional","Estadio Manuel Murillo Toro, Ibagué"],
+["f4_5","Fecha 4","2026-09-12T20:20:00-05:00","Once Caldas","Pereira","Estadio Palogrande, Manizales"],
+// FECHA 5
+["f5_1","Fecha 5","2026-09-18T18:00:00-05:00","Millonarios","Once Caldas","Estadio El Campín, Bogotá"],
+["f5_2","Fecha 5","2026-09-18T20:10:00-05:00","América de Cali","Tolima","Estadio Pascual Guerrero, Cali"],
+["f5_3","Fecha 5","2026-09-19T16:00:00-05:00","Atlético Nacional","Santa Fe","Estadio Atanasio Girardot, Medellín"],
+["f5_4","Fecha 5","2026-09-19T18:10:00-05:00","Junior","Bucaramanga","Estadio Metropolitano, Barranquilla"],
+["f5_5","Fecha 5","2026-09-19T20:20:00-05:00","Pereira","Deportivo Cali","Estadio Hernán Ramírez Villegas, Pereira"],
+// FECHA 6
+["f6_1","Fecha 6","2026-09-25T18:00:00-05:00","Santa Fe","Junior","Estadio El Campín, Bogotá"],
+["f6_2","Fecha 6","2026-09-25T20:10:00-05:00","Deportivo Cali","Atlético Nacional","Estadio Deportivo Cali, Palmira"],
+["f6_3","Fecha 6","2026-09-26T16:00:00-05:00","Independiente Medellín","Millonarios","Estadio Atanasio Girardot, Medellín"],
+["f6_4","Fecha 6","2026-09-26T18:10:00-05:00","Tolima","Pereira","Estadio Manuel Murillo Toro, Ibagué"],
+["f6_5","Fecha 6","2026-09-26T20:20:00-05:00","Once Caldas","América de Cali","Estadio Palogrande, Manizales"],
+// FECHA 7 (Clásicos)
+["f7_1","Fecha 7","2026-10-02T18:00:00-05:00","Santa Fe","Millonarios","Estadio El Campín, Bogotá"],
+["f7_2","Fecha 7","2026-10-02T20:10:00-05:00","Deportivo Cali","América de Cali","Estadio Deportivo Cali, Palmira"],
+["f7_3","Fecha 7","2026-10-03T16:00:00-05:00","Independiente Medellín","Atlético Nacional","Estadio Atanasio Girardot, Medellín"],
+["f7_4","Fecha 7","2026-10-03T18:10:00-05:00","Once Caldas","Pereira","Estadio Palogrande, Manizales"],
+["f7_5","Fecha 7","2026-10-03T20:20:00-05:00","Junior","Jaguares","Estadio Metropolitano, Barranquilla"],
+// FECHA 8
+["f8_1","Fecha 8","2026-10-09T18:00:00-05:00","Millonarios","Deportivo Cali","Estadio El Campín, Bogotá"],
+["f8_2","Fecha 8","2026-10-09T20:10:00-05:00","América de Cali","Santa Fe","Estadio Pascual Guerrero, Cali"],
+["f8_3","Fecha 8","2026-10-10T16:00:00-05:00","Atlético Nacional","Tolima","Estadio Atanasio Girardot, Medellín"],
+["f8_4","Fecha 8","2026-10-10T18:10:00-05:00","Junior","Independiente Medellín","Estadio Metropolitano, Barranquilla"],
+["f8_5","Fecha 8","2026-10-10T20:20:00-05:00","Bucaramanga","Pereira","Estadio Américo Montanini, Bucaramanga"],
+// FECHA 9
+["f9_1","Fecha 9","2026-10-16T18:00:00-05:00","Santa Fe","Once Caldas","Estadio El Campín, Bogotá"],
+["f9_2","Fecha 9","2026-10-16T20:10:00-05:00","Deportivo Cali","Junior","Estadio Deportivo Cali, Palmira"],
+["f9_3","Fecha 9","2026-10-17T16:00:00-05:00","Independiente Medellín","América de Cali","Estadio Atanasio Girardot, Medellín"],
+["f9_4","Fecha 9","2026-10-17T18:10:00-05:00","Tolima","Millonarios","Estadio Manuel Murillo Toro, Ibagué"],
+["f9_5","Fecha 9","2026-10-17T20:20:00-05:00","Pereira","Atlético Nacional","Estadio Hernán Ramírez Villegas, Pereira"],
+// FECHA 10
+["f10_1","Fecha 10","2026-10-23T18:00:00-05:00","Millonarios","Junior","Estadio El Campín, Bogotá"],
+["f10_2","Fecha 10","2026-10-23T20:10:00-05:00","América de Cali","Atlético Nacional","Estadio Pascual Guerrero, Cali"],
+["f10_3","Fecha 10","2026-10-24T16:00:00-05:00","Deportivo Cali","Santa Fe","Estadio Deportivo Cali, Palmira"],
+["f10_4","Fecha 10","2026-10-24T18:10:00-05:00","Independiente Medellín","Tolima","Estadio Atanasio Girardot, Medellín"],
+["f10_5","Fecha 10","2026-10-24T20:20:00-05:00","Once Caldas","Bucaramanga","Estadio Palogrande, Manizales"],
+// FASES FINALES Y CUADRANGULARES
+["fpc_q1","Cuadrangulares Fecha 1","2026-11-14T17:00:00-05:00","Por definir (Grupo A)","Por definir (Grupo A)","Estadio Por Definir"],
+["fpc_q2","Cuadrangulares Fecha 1","2026-11-14T19:15:00-05:00","Por definir (Grupo B)","Por definir (Grupo B)","Estadio Por Definir"],
+["fpc_fn1","Final Ida","2026-12-06T18:00:00-05:00","Ganador Grupo A","Ganador Grupo B","Estadio Finalista 1"],
+["fpc_fn2","Final Vuelta","2026-12-13T18:00:00-05:00","Ganador Grupo B","Ganador Grupo A","Estadio Finalista 2"]
 ];
 
 const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),venue:r[5]||"Estadio FPC",custom:false}));
