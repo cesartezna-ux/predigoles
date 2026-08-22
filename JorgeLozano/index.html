@@ -60,7 +60,8 @@
   .team{display:flex;align-items:center;gap:10px;padding:6px 0}
   .editnm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;flex:none;opacity:.7}
   .editnm:hover{opacity:1}
-  .team .fl{font-size:22px;width:26px;text-align:center;flex:none;filter:saturate(1.1)}
+  .team .fl{font-size:22px;width:26px;text-align:center;flex:none;filter:saturate(1.1);display:inline-flex;align-items:center;justify-content:center}
+  .team .fl .crest{width:24px;height:24px;object-fit:contain;flex:none;border-radius:4px}
   .team .nm{font-weight:600;font-size:15px;flex:1;min-width:0}
   .team .nm.win{color:var(--gold)}
   .box{font-family:var(--score);font-weight:600;width:46px;height:46px;flex:none;text-align:center;font-size:26px;color:var(--gold);background:#06120d;border:1px solid rgba(255,200,69,.25);border-radius:10px;line-height:46px;padding:0;box-shadow:inset 0 0 12px rgba(0,0,0,.6)}
@@ -130,6 +131,7 @@
   .box.real.live{color:var(--flare);border-color:rgba(255,77,109,.4);animation:pulse-live 2s ease-in-out infinite}
   @keyframes pulse-live{0%,100%{opacity:1}50%{opacity:.6}}
   .mystats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .mystats .sb{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .mystats .sb{background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
   .mystats .sb b{color:var(--gold);font-family:var(--score);font-size:16px}
   .select-popup { width:100%; background:#06120d; border:1px solid var(--faint); border-radius:12px; color:var(--line); font:600 15px var(--body); padding:13px; outline:none; margin-bottom:15px; }
@@ -150,67 +152,56 @@ localStorage.setItem("pg_tab",TAB);
 
 /* --- Fixture Liga BetPlay II-2026 (Todos contra Todos Completo + Fases Finales) --- */
 const RAW=[
-// FECHA 1
 ["f1_1","Fecha 1","2026-08-21T18:00:00-05:00","Millonarios","Atlético Nacional","Estadio El Campín, Bogotá"],
 ["f1_2","Fecha 1","2026-08-21T20:10:00-05:00","América de Cali","Junior","Estadio Pascual Guerrero, Cali"],
 ["f1_3","Fecha 1","2026-08-22T16:00:00-05:00","Independiente Medellín","Santa Fe","Estadio Atanasio Girardot, Medellín"],
 ["f1_4","Fecha 1","2026-08-22T18:10:00-05:00","Deportivo Cali","Bucaramanga","Estadio Deportivo Cali, Palmira"],
 ["f1_5","Fecha 1","2026-08-22T20:20:00-05:00","Once Caldas","Tolima","Estadio Palogrande, Manizales"],
-// FECHA 2
 ["f2_1","Fecha 2","2026-08-28T18:00:00-05:00","Atlético Nacional","América de Cali","Estadio Atanasio Girardot, Medellín"],
 ["f2_2","Fecha 2","2026-08-28T20:10:00-05:00","Junior","Millonarios","Estadio Metropolitano, Barranquilla"],
 ["f2_3","Fecha 2","2026-08-29T16:00:00-05:00","Santa Fe","Deportivo Cali","Estadio El Campín, Bogotá"],
 ["f2_4","Fecha 2","2026-08-29T18:10:00-05:00","Tolima","Independiente Medellín","Estadio Manuel Murillo Toro, Ibagué"],
 ["f2_5","Fecha 2","2026-08-29T20:20:00-05:00","Bucaramanga","Once Caldas","Estadio Américo Montanini, Bucaramanga"],
-// FECHA 3
 ["f3_1","Fecha 3","2026-09-04T18:00:00-05:00","Millonarios","Santa Fe","Estadio El Campín, Bogotá"],
 ["f3_2","Fecha 3","2026-09-04T20:10:00-05:00","América de Cali","Deportivo Cali","Estadio Pascual Guerrero, Cali"],
 ["f3_3","Fecha 3","2026-09-05T16:00:00-05:00","Atlético Nacional","Independiente Medellín","Estadio Atanasio Girardot, Medellín"],
 ["f3_4","Fecha 3","2026-09-05T18:10:00-05:00","Junior","Once Caldas","Estadio Metropolitano, Barranquilla"],
 ["f3_5","Fecha 3","2026-09-05T20:20:00-05:00","Bucaramanga","Tolima","Estadio Américo Montanini, Bucaramanga"],
-// FECHA 4
 ["f4_1","Fecha 4","2026-09-11T18:00:00-05:00","Santa Fe","América de Cali","Estadio El Campín, Bogotá"],
 ["f4_2","Fecha 4","2026-09-11T20:10:00-05:00","Deportivo Cali","Millonarios","Estadio Deportivo Cali, Palmira"],
 ["f4_3","Fecha 4","2026-09-12T16:00:00-05:00","Independiente Medellín","Junior","Estadio Atanasio Girardot, Medellín"],
 ["f4_4","Fecha 4","2026-09-12T18:10:00-05:00","Tolima","Atlético Nacional","Estadio Manuel Murillo Toro, Ibagué"],
 ["f4_5","Fecha 4","2026-09-12T20:20:00-05:00","Once Caldas","Pereira","Estadio Palogrande, Manizales"],
-// FECHA 5
 ["f5_1","Fecha 5","2026-09-18T18:00:00-05:00","Millonarios","Once Caldas","Estadio El Campín, Bogotá"],
 ["f5_2","Fecha 5","2026-09-18T20:10:00-05:00","América de Cali","Tolima","Estadio Pascual Guerrero, Cali"],
 ["f5_3","Fecha 5","2026-09-19T16:00:00-05:00","Atlético Nacional","Santa Fe","Estadio Atanasio Girardot, Medellín"],
 ["f5_4","Fecha 5","2026-09-19T18:10:00-05:00","Junior","Bucaramanga","Estadio Metropolitano, Barranquilla"],
 ["f5_5","Fecha 5","2026-09-19T20:20:00-05:00","Pereira","Deportivo Cali","Estadio Hernán Ramírez Villegas, Pereira"],
-// FECHA 6
 ["f6_1","Fecha 6","2026-09-25T18:00:00-05:00","Santa Fe","Junior","Estadio El Campín, Bogotá"],
 ["f6_2","Fecha 6","2026-09-25T20:10:00-05:00","Deportivo Cali","Atlético Nacional","Estadio Deportivo Cali, Palmira"],
 ["f6_3","Fecha 6","2026-09-26T16:00:00-05:00","Independiente Medellín","Millonarios","Estadio Atanasio Girardot, Medellín"],
 ["f6_4","Fecha 6","2026-09-26T18:10:00-05:00","Tolima","Pereira","Estadio Manuel Murillo Toro, Ibagué"],
 ["f6_5","Fecha 6","2026-09-26T20:20:00-05:00","Once Caldas","América de Cali","Estadio Palogrande, Manizales"],
-// FECHA 7 (Clásicos)
 ["f7_1","Fecha 7","2026-10-02T18:00:00-05:00","Santa Fe","Millonarios","Estadio El Campín, Bogotá"],
 ["f7_2","Fecha 7","2026-10-02T20:10:00-05:00","Deportivo Cali","América de Cali","Estadio Deportivo Cali, Palmira"],
 ["f7_3","Fecha 7","2026-10-03T16:00:00-05:00","Independiente Medellín","Atlético Nacional","Estadio Atanasio Girardot, Medellín"],
 ["f7_4","Fecha 7","2026-10-03T18:10:00-05:00","Once Caldas","Pereira","Estadio Palogrande, Manizales"],
 ["f7_5","Fecha 7","2026-10-03T20:20:00-05:00","Junior","Jaguares","Estadio Metropolitano, Barranquilla"],
-// FECHA 8
 ["f8_1","Fecha 8","2026-10-09T18:00:00-05:00","Millonarios","Deportivo Cali","Estadio El Campín, Bogotá"],
 ["f8_2","Fecha 8","2026-10-09T20:10:00-05:00","América de Cali","Santa Fe","Estadio Pascual Guerrero, Cali"],
 ["f8_3","Fecha 8","2026-10-10T16:00:00-05:00","Atlético Nacional","Tolima","Estadio Atanasio Girardot, Medellín"],
 ["f8_4","Fecha 8","2026-10-10T18:10:00-05:00","Junior","Independiente Medellín","Estadio Metropolitano, Barranquilla"],
 ["f8_5","Fecha 8","2026-10-10T20:20:00-05:00","Bucaramanga","Pereira","Estadio Américo Montanini, Bucaramanga"],
-// FECHA 9
 ["f9_1","Fecha 9","2026-10-16T18:00:00-05:00","Santa Fe","Once Caldas","Estadio El Campín, Bogotá"],
 ["f9_2","Fecha 9","2026-10-16T20:10:00-05:00","Deportivo Cali","Junior","Estadio Deportivo Cali, Palmira"],
 ["f9_3","Fecha 9","2026-10-17T16:00:00-05:00","Independiente Medellín","América de Cali","Estadio Atanasio Girardot, Medellín"],
 ["f9_4","Fecha 9","2026-10-17T18:10:00-05:00","Tolima","Millonarios","Estadio Manuel Murillo Toro, Ibagué"],
 ["f9_5","Fecha 9","2026-10-17T20:20:00-05:00","Pereira","Atlético Nacional","Estadio Hernán Ramírez Villegas, Pereira"],
-// FECHA 10
 ["f10_1","Fecha 10","2026-10-23T18:00:00-05:00","Millonarios","Junior","Estadio El Campín, Bogotá"],
 ["f10_2","Fecha 10","2026-10-23T20:10:00-05:00","América de Cali","Atlético Nacional","Estadio Pascual Guerrero, Cali"],
 ["f10_3","Fecha 10","2026-10-24T16:00:00-05:00","Deportivo Cali","Santa Fe","Estadio Deportivo Cali, Palmira"],
 ["f10_4","Fecha 10","2026-10-24T18:10:00-05:00","Independiente Medellín","Tolima","Estadio Atanasio Girardot, Medellín"],
 ["f10_5","Fecha 10","2026-10-24T20:20:00-05:00","Once Caldas","Bucaramanga","Estadio Palogrande, Manizales"],
-// FASES FINALES Y CUADRANGULARES
 ["fpc_q1","Cuadrangulares Fecha 1","2026-11-14T17:00:00-05:00","Por definir (Grupo A)","Por definir (Grupo A)","Estadio Por Definir"],
 ["fpc_q2","Cuadrangulares Fecha 1","2026-11-14T19:15:00-05:00","Por definir (Grupo B)","Por definir (Grupo B)","Estadio Por Definir"],
 ["fpc_fn1","Final Ida","2026-12-06T18:00:00-05:00","Ganador Grupo A","Ganador Grupo B","Estadio Finalista 1"],
@@ -219,15 +210,47 @@ const RAW=[
 
 const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),venue:r[5]||"Estadio FPC",custom:false}));
 
-/* --- Banderas / Escudos Equipos FPC --- */
+/* --- Banderas / Escudos Equipos FPC (emoji, respaldo si no hay imagen) --- */
 const FLAG={
   "Atlético Nacional":"🟢", "Millonarios":"🔵", "América de Cali":"🔴", "Santa Fe":"🦁", 
   "Junior":"🦈", "Independiente Medellín":"🔴", "Deportivo Cali":"🟢", "Once Caldas":"⚪", 
   "Tolima":"🟡", "Bucaramanga":"🟡", "Pereira":"🟡", "La Equidad":"🟢", 
-  "Envigado":"🟠", "Pasto":"🔴", "Águilas Doradas":"🦅", "Jaguarés":"🐆", 
+  "Envigado":"🟠", "Pasto":"🔴", "Águilas Doradas":"🦅", "Jaguares":"🐆", 
   "Alianza FC":"🔵", "Boyacá Chicó":"🟢", "Patriotas":"🔴", "Fortaleza":"🏰"
 };
-const flag=n=>FLAG[n]||"⚽";
+
+/* --- Escudos reales: nombre de equipo -> nombre de archivo en /escudos/ ---
+   Sube las imágenes a esa carpeta (raíz del repo, no dentro de cada carpeta de
+   cliente) con estos nombres EXACTOS. Mientras un archivo no exista, se usa el
+   emoji de respaldo automáticamente — no rompe nada. */
+const ESCUDOS={
+  "Atlético Nacional":"nacional.png",
+  "Millonarios":"millonarios.png",
+  "América de Cali":"america.png",
+  "Santa Fe":"santafe.png",
+  "Junior":"junior.png",
+  "Independiente Medellín":"medellin.png",
+  "Deportivo Cali":"depcali.png",
+  "Once Caldas":"oncecaldas.png",
+  "Tolima":"tolima.png",
+  "Bucaramanga":"bucaramanga.png",
+  "Pereira":"pereira.png",
+  "La Equidad":"equidad.png",
+  "Envigado":"envigado.png",
+  "Pasto":"pasto.png",
+  "Águilas Doradas":"aguilas.png",
+  "Jaguares":"jaguares.png",
+  "Alianza FC":"alianza.png",
+  "Boyacá Chicó":"chico.png",
+  "Patriotas":"patriotas.png",
+  "Fortaleza":"fortaleza.png"
+};
+function flag(n){
+  const archivo=ESCUDOS[n];
+  const emoji=FLAG[n]||"⚽";
+  if(!archivo)return emoji;
+  return`<img class="crest" src="/escudos/${archivo}" alt="" data-fallback="${escapeHtml(emoji)}" onerror="this.outerHTML=this.dataset.fallback">`;
+}
 
 const ALLOWED_TEAMS=Object.keys(FLAG).concat([
   "Por definir (A1)","Por definir (A2)","Por definir (A3)","Por definir (A4)",
@@ -279,7 +302,7 @@ function ptsFor(p,r){
   if(+p.h===+r.h&&+p.a===+r.a)s+=2;
   return s;
 }
-const COLO=m=>false; // Sin resaltado especial para selección nacional
+const COLO=m=>false;
 
 /* --- Apuesta / premios --- */
 function fmtCOP(n){return"$"+Math.round(n||0).toLocaleString("es-CO");}
