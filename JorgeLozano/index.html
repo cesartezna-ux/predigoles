@@ -172,7 +172,7 @@ const RAW=[
 ["fpc_fn2","Final Vuelta","2026-12-13T18:00:00-05:00","Ganador Grupo B","Ganador Grupo A","Estadio Finalista 2"]
 ];
 
-const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:new Date(r[2]).getTime(),venue:r[5]||"Estadio FPC",custom:false}));
+const FIXTURE=RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio FPC",custom:false}));
 
 /* --- Banderas / Escudos Equipos FPC (emoji, respaldo si no hay imagen) ---
    Los 20 equipos oficiales de Liga BetPlay DIMAYOR II-2026 (fuente: dimayor.com.co,
@@ -259,9 +259,21 @@ function allMatches(){
   const all=FIXTURE.map(m=>({...m})).concat(cm);
   for(const m of all){
     const ov=S.teamOverrides[m.id];
-    if(ov){if(ov.home)m.home=ov.home;if(ov.away)m.away=ov.away;}
+    if(ov){
+      if(ov.home)m.home=ov.home;
+      if(ov.away)m.away=ov.away;
+      if(ov.kick)m.kick=ov.kick;      // fecha/hora confirmada por el organizador
+      if(ov.venue)m.venue=ov.venue;
+    }
   }
-  return all.sort((a,b)=>a.kick-b.kick);
+  // Los partidos sin fecha (kick===null, "por confirmar") van al final,
+  // el resto ordenado normalmente por fecha.
+  return all.sort((a,b)=>{
+    if(a.kick==null&&b.kick==null)return 0;
+    if(a.kick==null)return 1;
+    if(b.kick==null)return -1;
+    return a.kick-b.kick;
+  });
 }
 function outcome(h,a){h=+h;a=+a;if(h>a)return"1";if(h<a)return"2";return"X";}
 function ptsFor(p,r){
@@ -410,7 +422,8 @@ function tiempoDesde(iso){
   return`hace ${min}m`;
 }
 function matchCardHtml(m){
-  const locked=S.now>=m.kick;
+  const sinFecha=m.kick==null;
+  const locked=!sinFecha&&S.now>=m.kick;
   const p=S.predsMe[m.id]||{};
   const res=S.results[m.id];
   const live=!res?S.live[m.id]:null;
@@ -422,11 +435,11 @@ function matchCardHtml(m){
     :`<input class="box" id="${side}_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${val}">`;
   const whenInner=live
     ?`<span class="cd soon">🔴 ${live.minute!=null?live.minute+"'":"EN VIVO"} · ${tiempoDesde(live.syncedAt)}</span>`
-    :`<span class="cd" id="cd_${m.id}"></span>`;
+    :sinFecha?"":`<span class="cd" id="cd_${m.id}"></span>`;
   return`<div class="match" id="card_${m.id}">
     <div class="mtop">
       <span class="grp">${m.g}</span>
-      <span class="when">${whenHtml(m.kick)}${whenInner}</span>
+      <span class="when">${sinFecha?"📋 Fecha por confirmar":whenHtml(m.kick)}${whenInner}</span>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:4px;">📍 ${escapeHtml(m.venue)}</div>
     <div class="cols"><span class="sp"></span><span class="colh">Pron.</span><span class="colh">Real</span></div>
@@ -438,7 +451,7 @@ function matchCardHtml(m){
 }
 
 function buildDayList(){
-  const ms=allMatches();
+  const ms=allMatches().filter(m=>m.kick!=null);
   const map=new Map();
   for(const m of ms){
     const dk=dayKey(m.kick);
@@ -458,48 +471,66 @@ function defaultDay(days){
 }
 
 function renderPartidos(c){
+  const sinFecha=allMatches().filter(m=>m.kick==null);
   const days=buildDayList();
-  if(!days.length){c.innerHTML=`<div class="empty"><span class="big">⚽</span>Aún no hay partidos cargados.</div>`;return;}
-  const activeKey=defaultDay(days);
-  S.selectedDay=activeKey;
-  const activeIdx=days.findIndex(d=>d.key===activeKey);
-  const activeDay=days[activeIdx];
-  const todayKey=dayKey(S.now);
+  if(!days.length&&!sinFecha.length){c.innerHTML=`<div class="empty"><span class="big">⚽</span>Aún no hay partidos cargados.</div>`;return;}
 
-  let chips="";
-  days.forEach((d,i)=>{
-    const isToday=d.key===todayKey;
-    chips+=`<div class="datechip ${i===activeIdx?"active":""} ${isToday?"hoy":""}" data-idx="${i}">${isToday?"Hoy · "+d.label:d.label}</div>`;
-  });
+  let html="";
+  if(sinFecha.length){
+    html+=`<div class="daygroup"><div class="dayhead"><span class="d">📋 Por confirmar (${sinFecha.length})</span><span class="rule"></span></div>`;
+    for(const m of sinFecha)html+=matchCardHtml(m);
+    html+="</div>";
+  }
 
-  let html=`<div class="datesel">
-    <button class="dayarrow" id="prevDay" ${activeIdx<=0?"disabled":""}>‹</button>
-    <div class="datechips" id="datechips">${chips}</div>
-    <button class="dayarrow" id="nextDay" ${activeIdx>=days.length-1?"disabled":""}>›</button>
-  </div>`;
-  html+=`<div class="daygroup"><div class="dayhead"><span class="d">${activeDay.label}</span><span class="rule"></span></div>`;
-  for(const m of activeDay.matches)html+=matchCardHtml(m);
-  html+="</div>";
+  if(days.length){
+    const activeKey=defaultDay(days);
+    S.selectedDay=activeKey;
+    const activeIdx=days.findIndex(d=>d.key===activeKey);
+    const activeDay=days[activeIdx];
+    const todayKey=dayKey(S.now);
+
+    let chips="";
+    days.forEach((d,i)=>{
+      const isToday=d.key===todayKey;
+      chips+=`<div class="datechip ${i===activeIdx?"active":""} ${isToday?"hoy":""}" data-idx="${i}">${isToday?"Hoy · "+d.label:d.label}</div>`;
+    });
+
+    html+=`<div class="datesel">
+      <button class="dayarrow" id="prevDay" ${activeIdx<=0?"disabled":""}>‹</button>
+      <div class="datechips" id="datechips">${chips}</div>
+      <button class="dayarrow" id="nextDay" ${activeIdx>=days.length-1?"disabled":""}>›</button>
+    </div>`;
+    html+=`<div class="daygroup"><div class="dayhead"><span class="d">${activeDay.label}</span><span class="rule"></span></div>`;
+    for(const m of activeDay.matches)html+=matchCardHtml(m);
+    html+="</div>";
+  }
+
   html+=`<div class="rules"><div><b>Cómo se ganan los puntos</b></div>
     <div style="margin-top:8px"><span class="pill">+1</span> si aciertas quién gana (o el empate).</div>
     <div><span class="pill">+2</span> extra si además clavas el marcador exacto. <span style="color:var(--muted)">(máximo <b style="color:var(--gold)">3</b> por partido)</span></div>
-    <div style="margin-top:8px">Cada partido se cierra a su hora de inicio.</div></div>`;
+    <div style="margin-top:8px">Cada partido se cierra a su hora de inicio. Los partidos "por confirmar" quedan abiertos hasta que el organizador defina su fecha.</div></div>`;
   c.innerHTML=html;
-  for(const m of activeDay.matches){
+
+  const visibles=sinFecha.concat(days.length?days[days.findIndex(d=>d.key===S.selectedDay)].matches:[]);
+  for(const m of visibles){
     const hi=document.getElementById("h_"+m.id),ai=document.getElementById("a_"+m.id);
     matchEls[m.id]={hi,ai,cd:document.getElementById("cd_"+m.id),foot:document.getElementById("foot_"+m.id)};
     const onIn=()=>handleInput(m.id);
     if(hi)hi.oninput=onIn;if(ai)ai.oninput=onIn;
     paintFoot(m);
   }
-  document.getElementById("datechips").querySelectorAll(".datechip").forEach(ch=>{
-    ch.onclick=()=>{S.selectedDay=days[+ch.dataset.idx].key;renderView();};
-  });
-  const prevBtn=document.getElementById("prevDay"),nextBtn=document.getElementById("nextDay");
-  if(prevBtn)prevBtn.onclick=()=>{if(activeIdx>0){S.selectedDay=days[activeIdx-1].key;renderView();}};
-  if(nextBtn)nextBtn.onclick=()=>{if(activeIdx<days.length-1){S.selectedDay=days[activeIdx+1].key;renderView();}};
-  const activeChip=document.querySelector(".datechip.active");
-  if(activeChip)activeChip.scrollIntoView({behavior:"instant",inline:"center",block:"nearest"});
+  const datechipsEl=document.getElementById("datechips");
+  if(datechipsEl){
+    datechipsEl.querySelectorAll(".datechip").forEach(ch=>{
+      ch.onclick=()=>{S.selectedDay=days[+ch.dataset.idx].key;renderView();};
+    });
+    const activeIdx=days.findIndex(d=>d.key===S.selectedDay);
+    const prevBtn=document.getElementById("prevDay"),nextBtn=document.getElementById("nextDay");
+    if(prevBtn)prevBtn.onclick=()=>{if(activeIdx>0){S.selectedDay=days[activeIdx-1].key;renderView();}};
+    if(nextBtn)nextBtn.onclick=()=>{if(activeIdx<days.length-1){S.selectedDay=days[activeIdx+1].key;renderView();}};
+    const activeChip=document.querySelector(".datechip.active");
+    if(activeChip)activeChip.scrollIntoView({behavior:"instant",inline:"center",block:"nearest"});
+  }
 }
 
 function clampVal(v){if(v==="")return"";let n=parseInt(v,10);if(isNaN(n))return"";if(n<0)n=0;if(n>49)n=49;return n;}
@@ -514,7 +545,7 @@ function handleInput(id){
 
 function paintFoot(m){
   const e=matchEls[m.id];if(!e||!e.foot)return;
-  const locked=S.now>=m.kick,res=S.results[m.id],p=S.predsMe[m.id];
+  const locked=m.kick!=null&&S.now>=m.kick,res=S.results[m.id],p=S.predsMe[m.id];
   let left="",right="";
   if(res){
     if(p){const pp=ptsFor(p,res);const cls=pp===3?"p3":(pp===1?"p1":"p0");const txt=pp===3?"¡Marcador exacto!":(pp===1?"Acertaste el ganador":"No acertaste");left=`<span class="status">${txt}</span>`;right=`<span class="pts ${cls}">+${pp} pts</span>`;}
@@ -543,7 +574,7 @@ function updateSaveBar(){
 async function savePreds(){
   const byId={};allMatches().forEach(m=>byId[m.id]=m);
   let dropped=0;
-  for(const id of[...S.dirty]){const m=byId[id];if(m&&S.now>=m.kick){dropped++;S.dirty.delete(id);}}
+  for(const id of[...S.dirty]){const m=byId[id];if(m&&m.kick!=null&&S.now>=m.kick){dropped++;S.dirty.delete(id);}}
   toast("Guardando en la nube...");
   const ok=await setJSON("preds_"+S.me.id,S.predsMe,true);
   await joinRoster();
@@ -693,6 +724,61 @@ function editTeamName(id,side,current){
   };
 }
 
+/* --- Editar fecha/hora/sede de un partido (organizador, solo si no tiene resultado) --- */
+function _epochToLocalInputValue(epoch){
+  // Convierte epoch ms a "YYYY-MM-DDTHH:mm" interpretado en hora de Colombia (-05:00),
+  // para que el input datetime-local muestre la hora real del partido sin importar
+  // en qué huso horario esté el organizador en ese momento.
+  if(epoch==null)return"";
+  const d=new Date(epoch-5*60*60*1000); // resta el offset para que toISOString() (UTC) muestre los dígitos de la hora COL
+  return d.toISOString().slice(0,16);
+}
+function editMatchSchedule(id,currentKick,currentVenue){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const valorActual=_epochToLocalInputValue(currentKick);
+  ov.innerHTML=`<div class="card">
+    <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
+    <h2>Fecha, hora y sede</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Solo se puede editar mientras el partido no tenga resultado cargado. La hora es en horario de Colombia.</p>
+    <label class="field">Fecha y hora (Colombia)</label>
+    <input class="input" id="ems_kick" type="datetime-local" value="${valorActual}">
+    <p style="color:var(--muted);font-size:12px;margin:10px 0 4px">Deja el campo vacío si todavía no está confirmada — el partido queda en "Por confirmar".</p>
+    <label class="field" style="margin-top:10px">Sede</label>
+    <input class="input" id="ems_venue" maxlength="60" value="${escapeHtml(currentVenue||"")}">
+    <div id="ems_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+    <button class="btn" id="ems_save" style="margin-top:10px">Guardar</button>
+    <button class="btn ghost" id="ems_clear" style="margin-top:10px;border-color:rgba(255,77,109,.4);color:var(--flare)">Quitar fecha (dejar "por confirmar")</button>
+    <button class="btn ghost" id="ems_cancel" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  document.getElementById("ems_cancel").onclick=()=>ov.remove();
+  document.getElementById("ems_clear").onclick=async()=>{
+    S.teamOverrides[id]=S.teamOverrides[id]||{};
+    S.teamOverrides[id].kick=null;
+    await setJSON("teamOverrides",S.teamOverrides,true);
+    ov.remove();
+    toast("Partido movido a \"Por confirmar\" ✓",false,3000);
+    if(S.view==="resultados")renderResultados(document.getElementById("content"));
+  };
+  document.getElementById("ems_save").onclick=async()=>{
+    const val=document.getElementById("ems_kick").value;
+    const venue=document.getElementById("ems_venue").value.trim();
+    const err=document.getElementById("ems_err");
+    S.teamOverrides[id]=S.teamOverrides[id]||{};
+    if(val){
+      const epoch=new Date(val+":00-05:00").getTime();
+      if(isNaN(epoch)){err.textContent="Fecha inválida.";return;}
+      S.teamOverrides[id].kick=epoch;
+    }
+    if(venue)S.teamOverrides[id].venue=venue;
+    await setJSON("teamOverrides",S.teamOverrides,true);
+    ov.remove();
+    toast("Partido actualizado ✓",false,3000);
+    if(S.view==="resultados")renderResultados(document.getElementById("content"));
+  };
+}
+
 /* --- Configuración de premios --- */
 function showBettingConfig(){
   const old=document.getElementById("ovl");if(old)old.remove();
@@ -787,19 +873,27 @@ function showPagos(){
 /* --- Panel de Resultados --- */
 function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
-  const ms=allMatches().slice().sort((a,b)=>b.kick-a.kick);
+  const ms=allMatches().slice().sort((a,b)=>{
+    if(a.kick==null&&b.kick==null)return 0;
+    if(a.kick==null)return -1; // sin fecha primero, necesitan atención
+    if(b.kick==null)return 1;
+    return b.kick-a.kick;
+  });
   
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo FPC: <b style="color:var(--gold)">${TAB}</b> · Configura los clasificados usando ✏️ e ingresa marcadores.</div>`;
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo FPC: <b style="color:var(--gold)">${TAB}</b> · Configura los clasificados con ✏️, la fecha/hora/sede con 📅 (solo mientras no tenga resultado), e ingresa marcadores.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showBettingConfig()" style="background:var(--raise);color:var(--gold)">💰 Configurar premios / inscripción</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPagos()" style="background:var(--raise);color:var(--gold)">✅ Estado de pagos (solo tú lo ves)</button></div>`;
   
   for(const m of ms){
-    const r=S.resWork[m.id]||{},locked=S.now>=m.kick;
+    const r=S.resWork[m.id]||{},locked=m.kick!=null&&S.now>=m.kick,sinFecha=m.kick==null;
+    const tieneResultado=!!S.results[m.id];
+    const cuandoLabel=sinFecha?`<span style="color:var(--flare)">📋 Sin fecha confirmada</span>`:`${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}`;
+    const btnFecha=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`;
     html+=`<div class="match" style="border-radius:14px">
       <div class="mtop"><span class="grp">🏆 ${m.g}</span>
-      <span class="when">${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}</span></div>
+      <span class="when">${cuandoLabel} ${btnFecha}</span></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}</div>
       <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button><input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}"></div>
       <div class="divider"></div>
@@ -808,7 +902,7 @@ function renderResultados(c){
   }
   c.innerHTML=html;
 
-  c.querySelectorAll(".editnm").forEach(b=>{
+  c.querySelectorAll(".editnm[data-side]").forEach(b=>{
     b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
   });
   for(const m of ms){
@@ -1068,6 +1162,10 @@ function tick(){
   if(S.view!=="partidos")return;
   for(const m of allMatches()){
     const e=matchEls[m.id];if(!e)continue;
+    if(m.kick==null){
+      if(e.hi&&e.hi.disabled){e.hi.disabled=false;e.ai.disabled=false;paintFoot(m);}
+      continue;
+    }
     const diff=m.kick-S.now,info=cd(diff);
     if(e.cd){if(info){e.cd.textContent="Cierra en "+info.t;e.cd.className="cd"+(info.soon?" soon":"");}else{e.cd.textContent="Cerrado";e.cd.className="cd closed";}}
     const locked=S.now>=m.kick;
