@@ -608,6 +608,15 @@ async function savePreds(){
   const byId={};allMatches().forEach(m=>byId[m.id]=m);
   let dropped=0;
   for(const id of[...S.dirty]){const m=byId[id];if(m&&m.kick!=null&&S.now>=m.kick){dropped++;S.dirty.delete(id);}}
+  const cantidadEnEstaAccion=S.dirty.size; // lo que de verdad se está enviando AHORA, no el histórico
+
+  if(cantidadEnEstaAccion===0){
+    // Todo lo pendiente se cerró justo antes de guardar — no hay nada real
+    // que enviar, así que ni siquiera llamamos al servidor.
+    updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();paintPendingBanner();
+    toast(`❌ ${dropped} partido${dropped===1?"":"s"} ya cerrado${dropped===1?"":"s"} — no se pudo enviar.`,true,5000);
+    return;
+  }
 
   // --- Animación honesta: dura exactamente lo que dure la espera real, nunca
   // promete un tiempo ni confirma nada antes de que el servidor responda. ---
@@ -635,8 +644,8 @@ async function savePreds(){
   S.savingPreds=false;
   updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();paintPendingBanner();
   if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión y vuelve a intentar.",true,5000);
-  else if(dropped>0)toast(`✅ Guardado. ${dropped} ya cerrado(s).`,false,5000);
-  else toast(`✅ ¡${Object.keys(S.predsMe).length} pronósticos guardados!`,false,5000);
+  else if(dropped>0)toast(`✅ ${cantidadEnEstaAccion} actualizado${cantidadEnEstaAccion===1?"":"s"}. ${dropped} ya cerrado${dropped===1?"":"s"}, no se envió.`,false,5500);
+  else toast(`✅ ${cantidadEnEstaAccion} pronóstico${cantidadEnEstaAccion===1?"":"s"} actualizado${cantidadEnEstaAccion===1?"":"s"}`,false,4000);
 }
 
 /* --- En Vivo --- */
