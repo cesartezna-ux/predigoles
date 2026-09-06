@@ -82,6 +82,7 @@
   .btn{display:block;width:100%;border:none;cursor:pointer;border-radius:14px;padding:15px;font:700 16px var(--body);letter-spacing:.02em;background:var(--gold);color:#231600;box-shadow:0 8px 26px rgba(255,200,69,.28)}
   .btn:active{transform:translateY(1px)}
   .btn.ghost{background:var(--panel);color:var(--line);border:1px solid var(--faint);box-shadow:none}
+  .btn.saving{background:var(--raise);color:var(--gold);box-shadow:none;cursor:wait;display:flex;align-items:center;justify-content:center;gap:10px}
   .lead{margin-top:8px}
   .leadhead{display:flex;justify-content:space-between;align-items:baseline;margin:4px 2px 14px}
   .leadhead .t{font-family:var(--display);font-size:20px;text-transform:uppercase;letter-spacing:.06em}
@@ -131,11 +132,17 @@
   .box.real.live{color:var(--flare);border-color:rgba(255,77,109,.4);animation:pulse-live 2s ease-in-out infinite}
   @keyframes pulse-live{0%,100%{opacity:1}50%{opacity:.6}}
   .mystats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .mystats .sb{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .mystats .sb{background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
   .mystats .sb b{color:var(--gold);font-family:var(--score);font-size:16px}
   .select-popup { width:100%; background:#06120d; border:1px solid var(--faint); border-radius:12px; color:var(--line); font:600 15px var(--body); padding:13px; outline:none; margin-bottom:15px; }
   .select-popup:focus { border-color:var(--mint); }
+  /* --- Animación de guardado (Opción C): balón oscilando, sin prometer tiempo --- */
+  .ball-spin{display:inline-block;animation:ballSpin 0.7s ease-in-out infinite;font-size:18px}
+  @keyframes ballSpin{
+    0%,100%{transform:translateY(0) rotate(0deg);}
+    50%{transform:translateY(-5px) rotate(180deg);}
+  }
+  .status.pending{color:var(--gold);font-weight:600}
 </style>
 
 <div class="wrap" id="root"></div>
@@ -243,6 +250,16 @@ async function sSet(k,v,sh){
 }
 async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}}
 async function setJSON(k,o,sh){return sSet(k,JSON.stringify(o),sh);}
+/* Escrituras protegidas: el backend exige que S.organizerPinHash coincida con el
+   PIN guardado en el grupo (o permite el primer set si el grupo aún no tiene PIN,
+   para no bloquear la configuración inicial). Si el backend rechaza, devuelve false. */
+async function setJSONAuth(k,o){
+  CACHE[k]=JSON.stringify(o);
+  const r=await cloudCall({action:"set",key:k,value:JSON.stringify(o),pin:S.organizerPinHash});
+  if(r&&r.status==="success")return true;
+  if(r&&r.message)toast("❌ "+r.message,true,4000);
+  return false;
+}
 async function fetchAllShared(){
   const r=await cloudCall({action:"getAll"});
   if(r){for(const k in r)CACHE[k]=r[k];return true;}
@@ -250,7 +267,7 @@ async function fetchAllShared(){
 }
 
 /* --- State --- */
-const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{},live:{},betting:{inscripcion:0,adminPct:0,premios:{p1:0,p2:0,p3:0},pagos:{}}};
+const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
 const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","🎯","👑","🐺"];
 let pendingIco=AVATARS[0];
 
@@ -285,21 +302,19 @@ function ptsFor(p,r){
 }
 const COLO=m=>false;
 
-/* --- Apuesta / premios --- */
+/* --- Premios --- */
 function fmtCOP(n){return"$"+Math.round(n||0).toLocaleString("es-CO");}
 function computePot(){
   const b=S.betting||{};
   const inscripcion=+b.inscripcion||0;
   const jugadores=S.roster.length;
   const total=inscripcion*jugadores;
-  const adminPct=+b.adminPct||0;
-  const adminCut=total*adminPct/100;
-  const distribuible=total-adminCut;
+  const distribuible=total; // peer-to-peer: no hay corte de administración
   const premios=b.premios||{};
   const p1=distribuible*(+premios.p1||0)/100;
   const p2=distribuible*(+premios.p2||0)/100;
   const p3=distribuible*(+premios.p3||0)/100;
-  return{inscripcion,jugadores,total,adminPct,adminCut,distribuible,p1,p2,p3};
+  return{inscripcion,jugadores,total,distribuible,p1,p2,p3};
 }
 const FD=new Intl.DateTimeFormat("es-CO",{weekday:"short",day:"numeric",month:"short"});
 const FT=new Intl.DateTimeFormat("es-CO",{hour:"numeric",minute:"2-digit",hour12:true});
@@ -352,14 +367,19 @@ function renderShell(){
   document.getElementById("orgBtn").onclick=async()=>{
     if(S.organizer){
       S.organizer=false;
+      S.organizerPinHash=null;
+      localStorage.removeItem("pg_pinhash_"+TAB);
       await setJSON("organizer",false,false);
       renderShell();renderView();
     } else {
       const ingresado=prompt("🔑 PIN de administrador:");
       if(ingresado===null) return;
       const storedHash=await getJSON("adminPin",true);
-      if(storedHash&&_hashPin(ingresado.trim())===storedHash){
+      const intentoHash=_hashPin(ingresado.trim());
+      if(storedHash&&intentoHash===storedHash){
         S.organizer=true;
+        S.organizerPinHash=intentoHash;
+        localStorage.setItem("pg_pinhash_"+TAB,intentoHash);
         await setJSON("organizer",true,false);
         renderShell();renderView();
         toast("Modo organizador activado ✓",false,3000);
@@ -403,6 +423,7 @@ function paintPendingBanner(){
 }
 
 let matchEls={};
+let matchesById={};
 function renderView(){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.v===S.view));
   const c=document.getElementById("content");
@@ -511,6 +532,7 @@ function renderPartidos(c){
     <div style="margin-top:8px">Cada partido se cierra a su hora de inicio. Los partidos "por confirmar" quedan abiertos hasta que el organizador defina su fecha.</div></div>`;
   c.innerHTML=html;
 
+  matchesById={};allMatches().forEach(x=>matchesById[x.id]=x);
   const visibles=sinFecha.concat(days.length?days[days.findIndex(d=>d.key===S.selectedDay)].matches:[]);
   for(const m of visibles){
     const hi=document.getElementById("h_"+m.id),ai=document.getElementById("a_"+m.id);
@@ -540,12 +562,14 @@ function handleInput(id){
   if(e.hi.value!==String(h))e.hi.value=h;
   if(e.ai.value!==String(a))e.ai.value=a;
   if(h===""||a==="")delete S.predsMe[id];else S.predsMe[id]={h,a};
-  S.dirty.add(id);updateSaveBar();
+  S.dirty.add(id);updateSaveBar();paintFoot(matchesById[id]);
 }
 
 function paintFoot(m){
+  if(!m)return;
   const e=matchEls[m.id];if(!e||!e.foot)return;
   const locked=m.kick!=null&&S.now>=m.kick,res=S.results[m.id],p=S.predsMe[m.id];
+  const sinGuardar=S.dirty.has(m.id); // escrito pero todavía no confirmado por el servidor
   let left="",right="";
   if(res){
     if(p){const pp=ptsFor(p,res);const cls=pp===3?"p3":(pp===1?"p1":"p0");const txt=pp===3?"¡Marcador exacto!":(pp===1?"Acertaste el ganador":"No acertaste");left=`<span class="status">${txt}</span>`;right=`<span class="pts ${cls}">+${pp} pts</span>`;}
@@ -555,14 +579,23 @@ function paintFoot(m){
     right=p?`<span class="status">Tu pronóstico: <b style="color:var(--line)">${p.h}–${p.a}</b></span>`:`<span class="status">Sin pronóstico</span>`;
   }else{
     left=`<span class="status">Abierto · escribe tu pronóstico</span>`;
-    right=p?`<span class="status" style="color:var(--mint);font-weight:700">✓ ${p.h}–${p.a} guardado</span>`:`<span class="status" style="color:var(--flare)">⚠️ sin pronóstico</span>`;
+    if(p&&sinGuardar){
+      right=`<span class="status pending">✏️ ${p.h}–${p.a} escrito · falta guardar</span>`;
+    }else if(p){
+      right=`<span class="status" style="color:var(--mint);font-weight:700">✓ ${p.h}–${p.a} guardado</span>`;
+    }else{
+      right=`<span class="status" style="color:var(--flare)">⚠️ sin pronóstico</span>`;
+    }
   }
   e.foot.innerHTML=`<span>${left}</span><span>${right}</span>`;
 }
 
 function updateSaveBar(){
   const bar=document.getElementById("savebar"),inner=bar.firstElementChild;
-  if(S.view==="partidos"&&S.dirty.size>0){
+  if(S.view==="partidos"&&S.savingPreds){
+    inner.innerHTML=`<button class="btn saving" id="saveBtn" disabled><span class="ball-spin">⚽</span><span id="savingLabel">Guardando...</span></button>`;
+    bar.style.display="block";
+  }else if(S.view==="partidos"&&S.dirty.size>0){
     inner.innerHTML=`<button class="btn" id="saveBtn">Guardar mis pronósticos (${S.dirty.size})</button>`;
     document.getElementById("saveBtn").onclick=savePreds;bar.style.display="block";
   }else if(S.view==="resultados"&&S.resDirty&&S.resDirty.size>0){
@@ -575,12 +608,33 @@ async function savePreds(){
   const byId={};allMatches().forEach(m=>byId[m.id]=m);
   let dropped=0;
   for(const id of[...S.dirty]){const m=byId[id];if(m&&m.kick!=null&&S.now>=m.kick){dropped++;S.dirty.delete(id);}}
-  toast("Guardando en la nube...");
+
+  // --- Animación honesta: dura exactamente lo que dure la espera real, nunca
+  // promete un tiempo ni confirma nada antes de que el servidor responda. ---
+  S.savingPreds=true;updateSaveBar();
+  const mensajes=["⚽ Guardando...","🥅 Ya casi...","✨ Anotando..."];
+  let mi=0;
+  const msgInterval=setInterval(()=>{
+    mi=(mi+1)%mensajes.length;
+    const lbl=document.getElementById("savingLabel");
+    if(lbl)lbl.textContent=mensajes[mi];
+  },2200);
+
   const ok=await setJSON("preds_"+S.me.id,S.predsMe,true);
-  await joinRoster();
-  S.allPreds[S.me.id]=Object.assign({},S.predsMe);
-  S.dirty.clear();updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();paintPendingBanner();
-  if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión.",true,5000);
+  if(ok){
+    // Solo llamamos a joinRoster si de verdad hace falta (registro nuevo o
+    // cambió nombre/avatar) — chequeo local, sin viaje de red, así que no
+    // cuesta nada hacerlo siempre, pero evita el segundo POST innecesario.
+    const yaEnRoster=S.roster.some(p=>p.id===S.me.id&&p.name===S.me.name&&p.ico===S.me.ico);
+    if(!yaEnRoster)await joinRoster();
+    S.allPreds[S.me.id]=Object.assign({},S.predsMe);
+    S.dirty.clear(); // solo se limpia si el guardado fue confirmado de verdad
+  }
+
+  clearInterval(msgInterval);
+  S.savingPreds=false;
+  updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();paintPendingBanner();
+  if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión y vuelve a intentar.",true,5000);
   else if(dropped>0)toast(`✅ Guardado. ${dropped} ya cerrado(s).`,false,5000);
   else toast(`✅ ¡${Object.keys(S.predsMe).length} pronósticos guardados!`,false,5000);
 }
@@ -639,7 +693,6 @@ function renderRanking(c){
   const pot=computePot();
   const premioHtml=pot.total>0?`<div class="rules" style="margin-bottom:14px;border-color:rgba(255,200,69,.35)">
     <div><b>🏆 Bote total: <span style="color:var(--gold)">${fmtCOP(pot.total)}</span></b> <span style="color:var(--muted);font-size:12px">(${pot.jugadores} jugador${pot.jugadores===1?"":"es"} inscrito${pot.jugadores===1?"":"s"})</span></div>
-    ${pot.adminPct>0?`<div style="margin-top:4px;font-size:12px">Administración: ${fmtCOP(pot.adminCut)} (${pot.adminPct}%) · A repartir: <b style="color:var(--line)">${fmtCOP(pot.distribuible)}</b></div>`:""}
     <div style="margin-top:8px">🥇 <b style="color:var(--gold)">${fmtCOP(pot.p1)}</b> &nbsp; 🥈 <b style="color:var(--line)">${fmtCOP(pot.p2)}</b> &nbsp; 🥉 <b style="color:var(--line)">${fmtCOP(pot.p3)}</b></div>
   </div>`:"";
   if(board.length===0){c.innerHTML=premioHtml+`<div class="empty"><span class="big">🏟️</span>Todavía nadie se ha unido.</div>`;return;}
@@ -685,9 +738,14 @@ async function showGroupEdit(){
     if(p1||p2){
       if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="El PIN debe tener 4 dígitos numéricos.";return;}
       if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
-      await setJSON("adminPin",_hashPin(p1),true);
+      const nuevoHash=_hashPin(p1);
+      const okPin=await setJSONAuth("adminPin",nuevoHash);
+      if(!okPin){err.textContent="No se pudo actualizar el PIN.";return;}
+      S.organizerPinHash=nuevoHash;
+      localStorage.setItem("pg_pinhash_"+TAB,nuevoHash);
     }
-    await setJSON("groupName",name,true);
+    const okName=await setJSONAuth("groupName",name);
+    if(!okName){err.textContent="No se pudo actualizar el nombre del grupo.";return;}
     S.groupName=name;
     ov.remove();renderShell();renderView();
     toast("Grupo actualizado ✓",false,3000);
@@ -717,7 +775,8 @@ function editTeamName(id,side,current){
     const name=document.getElementById("popup_select_team").value;
     S.teamOverrides[id]=S.teamOverrides[id]||{};
     S.teamOverrides[id][side]=name;
-    await setJSON("teamOverrides",S.teamOverrides,true);
+    const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
+    if(!ok)return;
     ov.remove();
     toast("Equipo actualizado ✓",false,2500);
     renderResultados(document.getElementById("content"));
@@ -726,11 +785,8 @@ function editTeamName(id,side,current){
 
 /* --- Editar fecha/hora/sede de un partido (organizador, solo si no tiene resultado) --- */
 function _epochToLocalInputValue(epoch){
-  // Convierte epoch ms a "YYYY-MM-DDTHH:mm" interpretado en hora de Colombia (-05:00),
-  // para que el input datetime-local muestre la hora real del partido sin importar
-  // en qué huso horario esté el organizador en ese momento.
   if(epoch==null)return"";
-  const d=new Date(epoch-5*60*60*1000); // resta el offset para que toISOString() (UTC) muestre los dígitos de la hora COL
+  const d=new Date(epoch-5*60*60*1000);
   return d.toISOString().slice(0,16);
 }
 function editMatchSchedule(id,currentKick,currentVenue){
@@ -756,7 +812,8 @@ function editMatchSchedule(id,currentKick,currentVenue){
   document.getElementById("ems_clear").onclick=async()=>{
     S.teamOverrides[id]=S.teamOverrides[id]||{};
     S.teamOverrides[id].kick=null;
-    await setJSON("teamOverrides",S.teamOverrides,true);
+    const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
+    if(!ok)return;
     ov.remove();
     toast("Partido movido a \"Por confirmar\" ✓",false,3000);
     if(S.view==="resultados")renderResultados(document.getElementById("content"));
@@ -772,7 +829,8 @@ function editMatchSchedule(id,currentKick,currentVenue){
       S.teamOverrides[id].kick=epoch;
     }
     if(venue)S.teamOverrides[id].venue=venue;
-    await setJSON("teamOverrides",S.teamOverrides,true);
+    const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
+    if(!ok)return;
     ov.remove();
     toast("Partido actualizado ✓",false,3000);
     if(S.view==="resultados")renderResultados(document.getElementById("content"));
@@ -789,11 +847,9 @@ function showBettingConfig(){
   ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
     <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
     <h2>Premios e inscripción</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto define lo que ve TODO el grupo (monto total y reparto).</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto define lo que ve TODO el grupo (monto total y reparto). Cada uno le transfiere directo al ganador según este reparto — la app no recauda ni mueve dinero.</p>
     <label class="field">Monto de inscripción por jugador (COP)</label>
     <input class="input" id="bc_insc" type="number" min="0" step="1000" value="${b.inscripcion||0}">
-    <label class="field" style="margin-top:12px">% para el administrador</label>
-    <input class="input" id="bc_admin" type="number" min="0" max="100" step="1" value="${b.adminPct||0}">
     <p style="color:var(--muted);font-size:12px;margin:14px 0 6px">Reparto entre los primeros 3 puestos (%):</p>
     <label class="field">🥇 1er puesto</label>
     <input class="input" id="bc_p1" type="number" min="0" max="100" step="1" value="${premios.p1||0}">
@@ -808,66 +864,30 @@ function showBettingConfig(){
   </div>`;
   function updatePreview(){
     const insc=+document.getElementById("bc_insc").value||0;
-    const adminPct=+document.getElementById("bc_admin").value||0;
     const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
     const jugadores=S.roster.length;
     const total=insc*jugadores;
-    const adminCut=total*adminPct/100;
-    const distribuible=total-adminCut;
     const pv=document.getElementById("bc_preview");
     const sumaPremios=p1+p2+p3;
-    pv.innerHTML=`Con <b style="color:var(--line)">${jugadores}</b> jugador(es) registrados: bote total <b style="color:var(--gold)">${fmtCOP(total)}</b> · admin <b style="color:var(--line)">${fmtCOP(adminCut)}</b> · a repartir <b style="color:var(--gold)">${fmtCOP(distribuible)}</b><br>
-      🥇 ${fmtCOP(distribuible*p1/100)} · 🥈 ${fmtCOP(distribuible*p2/100)} · 🥉 ${fmtCOP(distribuible*p3/100)}
+    pv.innerHTML=`Con <b style="color:var(--line)">${jugadores}</b> jugador(es) registrados: bote total <b style="color:var(--gold)">${fmtCOP(total)}</b><br>
+      🥇 ${fmtCOP(total*p1/100)} · 🥈 ${fmtCOP(total*p2/100)} · 🥉 ${fmtCOP(total*p3/100)}
       ${sumaPremios!==100?`<br><span style="color:var(--flare)">⚠️ Los porcentajes suman ${sumaPremios}%, no 100%.</span>`:""}`;
   }
-  ["bc_insc","bc_admin","bc_p1","bc_p2","bc_p3"].forEach(id=>document.getElementById(id).oninput=updatePreview);
+  ["bc_insc","bc_p1","bc_p2","bc_p3"].forEach(id=>document.getElementById(id).oninput=updatePreview);
   updatePreview();
   document.getElementById("bc_cancel").onclick=()=>ov.remove();
   document.getElementById("bc_save").onclick=async()=>{
     const insc=+document.getElementById("bc_insc").value||0;
-    const adminPct=+document.getElementById("bc_admin").value||0;
     const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
     const err=document.getElementById("bc_err");
-    if(insc<0||adminPct<0||adminPct>100||p1<0||p2<0||p3<0){err.textContent="Valores no válidos.";return;}
-    S.betting={inscripcion:insc,adminPct,premios:{p1,p2,p3},pagos:(S.betting&&S.betting.pagos)||{}};
-    await setJSON("betting",S.betting,true);
+    if(insc<0||p1<0||p2<0||p3<0){err.textContent="Valores no válidos.";return;}
+    S.betting={inscripcion:insc,premios:{p1,p2,p3}};
+    const ok=await setJSONAuth("betting",S.betting);
+    if(!ok)return;
     ov.remove();
     toast("Premios actualizados ✓",false,3000);
     if(S.view==="ranking")renderRanking(document.getElementById("content"));
   };
-}
-
-/* --- Estado de pagos --- */
-function showPagos(){
-  const old=document.getElementById("ovl");if(old)old.remove();
-  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
-  document.body.appendChild(ov);
-  const pagos=(S.betting&&S.betting.pagos)||{};
-  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
-    <div class="kicker" style="color:var(--gold)">Modo Organizador · Privado</div>
-    <h2>Estado de pagos</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Solo tú ves esta lista.</p>
-    <div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;margin-bottom:16px" id="pagos_list">
-      ${S.roster.map(p=>{
-        const pagado=!!pagos[p.id];
-        return`<div style="display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--faint);border-radius:12px;padding:11px 14px">
-          <span style="font-size:20px">${p.ico||"⚽"}</span><span style="font-weight:700;flex:1">${escapeHtml(p.name)}</span>
-          <button class="pg-toggle" data-id="${p.id}" style="background:${pagado?"var(--mint)":"var(--raise)"};color:${pagado?"#06241d":"var(--muted)"};border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:12px;cursor:pointer">${pagado?"✓ Pagado":"Pendiente"}</button>
-        </div>`;
-      }).join("")}
-    </div>
-    <button class="btn ghost" id="pg_close">Cerrar</button>
-  </div>`;
-  document.getElementById("pg_close").onclick=()=>ov.remove();
-  ov.querySelectorAll(".pg-toggle").forEach(btn=>{
-    btn.onclick=async()=>{
-      const id=btn.dataset.id;
-      S.betting.pagos=S.betting.pagos||{};
-      S.betting.pagos[id]=!S.betting.pagos[id];
-      await setJSON("betting",S.betting,true);
-      showPagos();
-    };
-  });
 }
 
 /* --- Panel de Resultados --- */
@@ -875,7 +895,7 @@ function renderResultados(c){
   S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
   const ms=allMatches().slice().sort((a,b)=>{
     if(a.kick==null&&b.kick==null)return 0;
-    if(a.kick==null)return -1; // sin fecha primero, necesitan atención
+    if(a.kick==null)return -1;
     if(b.kick==null)return 1;
     return b.kick-a.kick;
   });
@@ -884,7 +904,6 @@ function renderResultados(c){
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showBettingConfig()" style="background:var(--raise);color:var(--gold)">💰 Configurar premios / inscripción</button></div>`;
-  html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPagos()" style="background:var(--raise);color:var(--gold)">✅ Estado de pagos (solo tú lo ves)</button></div>`;
   
   for(const m of ms){
     const r=S.resWork[m.id]||{},locked=m.kick!=null&&S.now>=m.kick,sinFecha=m.kick==null;
@@ -922,7 +941,7 @@ async function saveResultsBatch(){
   S.results=Object.assign({},S.resWork);
   Object.keys(S.results).forEach(k=>{const r=S.results[k];if(!r||r.h==null||r.a==null)delete S.results[k];});
   toast("Actualizando marcadores...");
-  const ok=await setJSON("results",S.results,true);
+  const ok=await setJSONAuth("results",S.results);
   S.resDirty.clear();updateSaveBar();
   toast(ok?"Resultados guardados ✓":"Error al guardar",!ok);
   if(S.view==="ranking")renderRanking(document.getElementById("content"));
@@ -1215,6 +1234,7 @@ window.addEventListener("focus",refreshShared);
     S.allPreds={};
     S.me=await getJSON("me",false);
     S.organizer=(await getJSON("organizer",false))||false;
+    S.organizerPinHash=S.organizer?localStorage.getItem("pg_pinhash_"+TAB):null;
     await fetchAllShared();
     S.results=(await getJSON("results",true))||{};
     S.custom=(await getJSON("custom",true))||[];
@@ -1222,7 +1242,7 @@ window.addEventListener("focus",refreshShared);
     S.groupName=await getJSON("groupName",true);
     S.teamOverrides=(await getJSON("teamOverrides",true))||{};
     S.live=(await getJSON("live",true))||{};
-    S.betting=(await getJSON("betting",true))||{inscripcion:0,adminPct:0,premios:{p1:0,p2:0,p3:0},pagos:{}};
+    S.betting=(await getJSON("betting",true))||{inscripcion:0,premios:{p1:0,p2:0,p3:0}};
     if(S.me){
       S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};
       const yaEnRoster=S.roster.some(p=>p.id===S.me.id&&p.name===S.me.name&&p.ico===S.me.ico);
