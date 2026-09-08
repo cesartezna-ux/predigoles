@@ -154,6 +154,7 @@ const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KS
 
 /* --- Multi-tenant con soporte para ?grupo= o ?tab= --- */
 const _qp=new URLSearchParams(location.search);
+const ES_PANEL_CENTRAL=_qp.get("admin")==="central";
 const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"fpc2026").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"fpc2026";
 localStorage.setItem("pg_tab",TAB);
 
@@ -970,44 +971,16 @@ async function saveResultsBatch(){
 }
 
 /* --- Setup inicial --- */
-function showGroupSetup(onDone){
+function showGrupoNoEncontrado(){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
-  const torneoOptions=Object.keys(TOURNAMENTS).map(id=>`<option value="${id}">${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
-  ov.innerHTML=`<div class="card" style="border-color:var(--mint);box-shadow:0 0 30px rgba(54,224,191,.15)">
-    <div class="kicker" style="color:var(--mint)">Configuración Inicial</div>
-    <h2>Crea tu polla</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Configura el grupo antes de invitar a los demás.</p>
-    <label class="field">Torneo</label>
-    <select class="select-popup" id="gn_torneo">${torneoOptions}</select>
-    <label class="field" style="margin-top:14px">Nombre de la polla</label>
-    <input class="input" id="gn_in" maxlength="30" placeholder="Ej: Polla de la Oficina...">
-    <label class="field" style="margin-top:14px">PIN de administrador (4 dígitos)</label>
-    <input class="input" id="ap1_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
-    <label class="field" style="margin-top:10px">Confirma el PIN</label>
-    <input class="input" id="ap2_in" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:24px;text-align:center">
-    <div id="gs_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
-    <button class="btn" id="gs_save" style="margin-top:16px">Crear grupo</button>
+  ov.innerHTML=`<div class="card" style="border-color:rgba(255,77,109,.4)">
+    <div class="kicker" style="color:var(--flare)">Grupo no encontrado</div>
+    <h2>Este link no existe todavía</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Los grupos de Predigoles se crean solo desde el administrador central — este identificador (<b style="color:var(--line)">${escapeHtml(TAB)}</b>) todavía no ha sido provisionado.</p>
+    <p style="color:var(--muted);font-size:13px">Si crees que esto es un error, contacta a quien te compartió el link.</p>
   </div>`;
-  document.getElementById("gs_save").onclick=async()=>{
-    const torneoId=document.getElementById("gn_torneo").value;
-    const name=document.getElementById("gn_in").value.trim();
-    const p1=document.getElementById("ap1_in").value.trim(),p2=document.getElementById("ap2_in").value.trim();
-    const err=document.getElementById("gs_err");
-    if(!name){err.textContent="Escribe el nombre del grupo.";return;}
-    if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="PIN de 4 dígitos.";return;}
-    if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
-    document.getElementById("gs_save").disabled=true;
-    await setJSON("torneoId",torneoId,true);
-    await setJSON("groupName",name,true);
-    await setJSON("adminPin",_hashPin(p1),true);
-    S.torneoId=torneoId;activarTorneo(torneoId);
-    S.groupName=name;
-    ov.remove();
-    toast(`Grupo "${name}" creado ✓`,false,5000);
-    if(onDone)onDone();
-  };
 }
 
 /* --- Onboarding --- */
@@ -1205,6 +1178,7 @@ async function showPinReset(){
 
 /* --- Tick --- */
 function tick(){
+  if(ES_PANEL_CENTRAL)return;
   S.now=Date.now();
   if(S.view!=="partidos")return;
   for(const m of allMatches()){
@@ -1223,6 +1197,7 @@ setInterval(tick,1000);
 
 /* --- Sync --- */
 async function refreshShared(){
+  if(ES_PANEL_CENTRAL)return;
   try{
     const ok=await fetchAllShared();if(!ok)return;
     const roster=(await getJSON("roster",true))||S.roster;
@@ -1256,8 +1231,165 @@ async function refreshShared(){
 setInterval(refreshShared,25000);
 window.addEventListener("focus",refreshShared);
 
+/* --- Panel Central del Administrador (predigoles.com/?admin=central) ---
+   Completamente separado del flujo normal de un grupo. Protegido con el PIN
+   maestro (nunca el mismo PIN de ningún grupo individual). Aquí nacen todos
+   los grupos nuevos — ya no existe autoconfiguración espontánea. */
+let PC_masterHash=null;
+let PC_grupos=[];
+
+function pcCard(inner){
+  root.innerHTML=`<div style="max-width:520px;margin:40px auto;padding:0 14px">${inner}</div>`;
+}
+
+function bootPanelCentral(){
+  pcCard(`<div class="card" style="max-width:100%">
+    <div class="kicker" style="color:var(--gold)">Predigoles · Administrador Central</div>
+    <h2>Acceso</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Este PIN es distinto al de cualquier grupo — es tuyo, único, y no se guarda en este navegador entre sesiones por seguridad.</p>
+    <label class="field">PIN maestro</label>
+    <input class="input" id="pc_pin" type="password" inputmode="numeric" style="letter-spacing:.3em;font-size:22px;text-align:center">
+    <div id="pc_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+    <button class="btn" id="pc_entrar" style="margin-top:10px">Entrar</button>
+  </div>`);
+  const pi=document.getElementById("pc_pin");
+  setTimeout(()=>pi.focus(),80);
+  async function intentar(){
+    const err=document.getElementById("pc_err");
+    const hash=_hashPin(pi.value.trim());
+    const r=await cloudCall({action:"adminListarGrupos",masterPin:hash});
+    if(r&&r.status==="success"){
+      PC_masterHash=hash;
+      PC_grupos=r.grupos||[];
+      renderPanelCentralMain();
+    }else{
+      err.textContent=(r&&r.message)||"No se pudo conectar.";
+    }
+  }
+  document.getElementById("pc_entrar").onclick=intentar;
+  pi.onkeydown=e=>{if(e.key==="Enter")intentar();};
+}
+
+function renderPanelCentralMain(){
+  const filas=PC_grupos.length?PC_grupos.map(g=>`
+    <div class="row">
+      <div class="who">
+        <div class="nm">${escapeHtml(g.nombreGrupo||g.grupoId)}</div>
+        <div class="sub">
+          ID: <b style="color:var(--line)">${escapeHtml(g.grupoId)}</b> ·
+          Torneo: ${escapeHtml((TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId)}<br>
+          Admin: ${escapeHtml(g.nombreAdmin||"—")} · ${escapeHtml(g.celularAdmin||"—")} · ${escapeHtml(g.correoAdmin||"—")}
+        </div>
+      </div>
+      <div class="score" style="text-align:right">
+        <select class="mini pc-estado" data-id="${escapeHtml(g.grupoId)}" style="width:auto;padding:6px 8px;font-size:12px">
+          <option value="Pendiente" ${g.estadoPago==="Pendiente"?"selected":""}>💰 Pendiente</option>
+          <option value="Pagado" ${g.estadoPago==="Pagado"?"selected":""}>✅ Pagado</option>
+          <option value="Cortesía" ${g.estadoPago==="Cortesía"?"selected":""}>🎁 Cortesía</option>
+        </select>
+      </div>
+    </div>`).join(""):`<div class="empty" style="padding:30px 10px"><span class="big">📋</span>Todavía no hay grupos creados.</div>`;
+
+  pcCard(`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h1 style="font-family:var(--display);font-size:28px;margin:0;text-transform:uppercase">Panel Central</h1>
+      <button class="link-btn" id="pc_salir">salir</button>
+    </div>
+    <button class="btn" id="pc_nuevo" style="margin-bottom:18px">➕ Crear grupo nuevo</button>
+    ${filas}
+  `);
+  document.getElementById("pc_salir").onclick=()=>{PC_masterHash=null;bootPanelCentral();};
+  document.getElementById("pc_nuevo").onclick=showCrearGrupo;
+  document.querySelectorAll(".pc-estado").forEach(sel=>{
+    sel.onchange=async()=>{
+      const r=await cloudCall({action:"adminActualizarPago",masterPin:PC_masterHash,grupoId:sel.dataset.id,estadoPago:sel.value});
+      if(r&&r.status==="success")toast("Estado de pago actualizado ✓",false,2500);
+      else toast("No se pudo actualizar.",true,3000);
+    };
+  });
+}
+
+function showCrearGrupo(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const torneoOptions=Object.keys(TOURNAMENTS).map(id=>`<option value="${id}">${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
+  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+    <div class="kicker" style="color:var(--gold)">Panel Central</div>
+    <h2>Crear grupo</h2>
+    <label class="field">ID del grupo (para el link — solo letras, números, guiones)</label>
+    <input class="input" id="cg_id" maxlength="40" placeholder="ej: cliente-oficina1">
+    <label class="field" style="margin-top:12px">Nombre del grupo</label>
+    <input class="input" id="cg_nombre" maxlength="30" placeholder="Ej: Polla Oficina Cliente X">
+    <label class="field" style="margin-top:12px">Torneo</label>
+    <select class="select-popup" id="cg_torneo">${torneoOptions}</select>
+    <label class="field">Nombre del administrador del grupo</label>
+    <input class="input" id="cg_admin_nombre" maxlength="60" placeholder="Nombre de contacto">
+    <label class="field" style="margin-top:10px">Celular del administrador</label>
+    <input class="input" id="cg_admin_cel" maxlength="20" placeholder="Ej: 3001234567">
+    <label class="field" style="margin-top:10px">Correo del administrador</label>
+    <input class="input" id="cg_admin_correo" type="email" maxlength="60" placeholder="correo@ejemplo.com">
+    <label class="field" style="margin-top:10px">PIN de administrador (déjalo vacío para generar uno al azar)</label>
+    <input class="input" id="cg_pin" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:20px;text-align:center">
+    <div id="cg_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+    <button class="btn" id="cg_crear" style="margin-top:10px">Crear</button>
+    <button class="btn ghost" id="cg_cancelar" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  document.getElementById("cg_cancelar").onclick=()=>ov.remove();
+  document.getElementById("cg_crear").onclick=async()=>{
+    const err=document.getElementById("cg_err");
+    const grupoId=document.getElementById("cg_id").value.trim();
+    const nombreGrupo=document.getElementById("cg_nombre").value.trim();
+    const torneoId=document.getElementById("cg_torneo").value;
+    const nombreAdmin=document.getElementById("cg_admin_nombre").value.trim();
+    const celularAdmin=document.getElementById("cg_admin_cel").value.trim();
+    const correoAdmin=document.getElementById("cg_admin_correo").value.trim();
+    const pin=document.getElementById("cg_pin").value.trim();
+    if(!grupoId||!/^[a-zA-Z0-9_-]{1,40}$/.test(grupoId)){err.textContent="ID de grupo inválido (solo letras, números, guiones).";return;}
+    if(!nombreGrupo){err.textContent="Falta el nombre del grupo.";return;}
+    if(pin&&!/^\d{4}$/.test(pin)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
+    document.getElementById("cg_crear").disabled=true;
+    const r=await cloudCall({action:"adminProvisionarGrupo",masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,nombreAdmin,celularAdmin,correoAdmin,pin});
+    if(r&&r.status==="success"){
+      ov.remove();
+      mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo);
+    }else{
+      document.getElementById("cg_crear").disabled=false;
+      err.textContent=(r&&r.message)||"No se pudo crear el grupo.";
+    }
+  };
+}
+
+function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const link=`${location.origin}/?grupo=${grupoId}`;
+  ov.innerHTML=`<div class="card" style="border-color:var(--mint)">
+    <div class="kicker" style="color:var(--mint)">Grupo creado ✓</div>
+    <h2>${escapeHtml(nombreGrupo)}</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Copia esto y mándaselo al administrador del grupo — es la única vez que se muestra el PIN en texto plano.</p>
+    <label class="field">Link</label>
+    <input class="input" id="gc_link" readonly value="${escapeHtml(link)}">
+    <label class="field" style="margin-top:10px">PIN de administrador</label>
+    <input class="input" id="gc_pin" readonly value="${escapeHtml(pin)}" style="letter-spacing:.3em;font-size:22px;text-align:center;color:var(--gold)">
+    <button class="btn" id="gc_copiar" style="margin-top:14px">📋 Copiar link + PIN</button>
+    <button class="btn ghost" id="gc_cerrar" style="margin-top:10px">Cerrar</button>
+  </div>`;
+  document.getElementById("gc_copiar").onclick=()=>{
+    navigator.clipboard.writeText(`Link: ${link}\nPIN de administrador: ${pin}`);
+    toast("Copiado ✓",false,2000);
+  };
+  document.getElementById("gc_cerrar").onclick=async()=>{
+    ov.remove();
+    const r=await cloudCall({action:"adminListarGrupos",masterPin:PC_masterHash});
+    if(r&&r.status==="success"){PC_grupos=r.grupos||[];renderPanelCentralMain();}
+  };
+}
+
 /* --- Boot --- */
 (async function boot(){
+  if(ES_PANEL_CENTRAL){ bootPanelCentral(); return; }
   try{
     S.allPreds={};
     S.me=await getJSON("me",false);
@@ -1282,11 +1414,7 @@ window.addEventListener("focus",refreshShared);
     if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
     
     if(!S.groupName){
-      showGroupSetup(()=>{
-        renderShell();
-        renderView();
-        if(!S.me)showOnboarding(false);
-      });
+      showGrupoNoEncontrado();
       return;
     }
     
