@@ -1270,6 +1270,11 @@ function bootPanelCentral(){
   pi.onkeydown=e=>{if(e.key==="Enter")intentar();};
 }
 
+function fmtFechaCorta(iso){
+  if(!iso)return"—";
+  try{return cap(FD.format(new Date(iso).getTime()));}catch(e){return"—";}
+}
+
 function renderPanelCentralMain(){
   const filas=PC_grupos.length?PC_grupos.map(g=>`
     <div class="row">
@@ -1277,8 +1282,13 @@ function renderPanelCentralMain(){
         <div class="nm">${escapeHtml(g.nombreGrupo||g.grupoId)}</div>
         <div class="sub">
           ID: <b style="color:var(--line)">${escapeHtml(g.grupoId)}</b> ·
-          Torneo: ${escapeHtml((TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId)}<br>
+          Torneo: ${escapeHtml((TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId)} ·
+          Creado: ${fmtFechaCorta(g.fechaCreacion)}<br>
           Admin: ${escapeHtml(g.nombreAdmin||"—")} · ${escapeHtml(g.celularAdmin||"—")} · ${escapeHtml(g.correoAdmin||"—")}
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <a href="${location.origin}/?grupo=${encodeURIComponent(g.grupoId)}" target="_blank" class="link-btn" style="text-decoration:none;color:var(--mint)">🔗 Abrir grupo</a>
+          <button class="link-btn pc-reset" data-id="${escapeHtml(g.grupoId)}" data-nombre="${escapeHtml(g.nombreGrupo||g.grupoId)}" style="color:var(--flare)">🔑 Resetear PIN</button>
         </div>
       </div>
       <div class="score" style="text-align:right">
@@ -1291,15 +1301,28 @@ function renderPanelCentralMain(){
     </div>`).join(""):`<div class="empty" style="padding:30px 10px"><span class="big">📋</span>Todavía no hay grupos creados.</div>`;
 
   pcCard(`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="kicker" style="color:var(--mint);margin-bottom:2px">PREDIGOLES</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <h1 style="font-family:var(--display);font-size:28px;margin:0;text-transform:uppercase">Panel Central</h1>
       <button class="link-btn" id="pc_salir">salir</button>
     </div>
+    <div style="color:var(--muted);font-size:12.5px;margin-bottom:16px">${PC_grupos.length} grupo${PC_grupos.length===1?"":"s"} registrado${PC_grupos.length===1?"":"s"}</div>
     <button class="btn" id="pc_nuevo" style="margin-bottom:18px">➕ Crear grupo nuevo</button>
     ${filas}
   `);
   document.getElementById("pc_salir").onclick=()=>{PC_masterHash=null;bootPanelCentral();};
   document.getElementById("pc_nuevo").onclick=showCrearGrupo;
+  document.querySelectorAll(".pc-reset").forEach(btn=>{
+    btn.onclick=async()=>{
+      if(!confirm(`¿Resetear el PIN de "${btn.dataset.nombre}"? El PIN anterior deja de funcionar de inmediato.`))return;
+      const r=await cloudCall({action:"adminResetearPin",masterPin:PC_masterHash,grupoId:btn.dataset.id});
+      if(r&&r.status==="success"){
+        mostrarGrupoCreado(r.grupoId,r.pin,btn.dataset.nombre);
+      }else{
+        toast((r&&r.message)||"No se pudo resetear.",true,4000);
+      }
+    };
+  });
   document.querySelectorAll(".pc-estado").forEach(sel=>{
     sel.onchange=async()=>{
       const r=await cloudCall({action:"adminActualizarPago",masterPin:PC_masterHash,grupoId:sel.dataset.id,estadoPago:sel.value});
