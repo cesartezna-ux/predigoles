@@ -172,29 +172,11 @@ const TOURNAMENTS={
     kicker:"Liga BetPlay II-2026",
     h1a:"Rumbo al ",h1b:"Título",
     subtitulo:"Acierta el resultado y clava el marcador. Demuestra quién sabe más del FPC.",
-    // Fecha 6 real, confirmada (fuentes: dimayor.com.co, futbolred, infobae — 22-ago-2026).
-    // El calendario se descuadró por el terremoto del 10 de agosto (partidos aplazados).
-    RAW:[
-      ["f6_1","Fecha 6","2026-08-21T16:05:00-05:00","Jaguares F.C.","Boyacá Chicó F.C.","Estadio de Jaguares F.C. (por confirmar sede exacta)"],
-      ["f6_2","Fecha 6","2026-08-21T19:30:00-05:00","Alianza Valledupar F.C.","Deportivo Pereira","Estadio Armando Maestre Pavajeau, Valledupar"],
-      ["f6_3","Fecha 6","2026-08-22T15:30:00-05:00","Deportes Tolima","Atlético Bucaramanga","Estadio Manuel Murillo Toro, Ibagué"],
-      ["f6_4","Fecha 6","2026-08-22T15:30:00-05:00","Águilas Doradas","Millonarios F.C.","Estadio Cincuentenario, Medellín"],
-      ["f6_5","Fecha 6","2026-08-22T16:05:00-05:00","Independiente Santa Fe","América de Cali","Estadio El Campín, Bogotá"],
-      ["f6_6","Fecha 6","2026-08-22T18:10:00-05:00","Independiente Medellín","Cúcuta Deportivo","Estadio Atanasio Girardot, Medellín"],
-      ["f6_7","Fecha 6","2026-08-22T20:15:00-05:00","Fortaleza","Atlético Nacional","Estadio Metropolitano de Techo, Bogotá"],
-      ["f6_8","Fecha 6","2026-08-23T14:00:00-05:00","Deportivo Pasto","Llaneros F.C.","Estadio Departamental Libertad, Pasto"],
-      ["f6_9","Fecha 6","2026-08-23T16:05:00-05:00","Deportivo Cali","Internacional de Bogotá","Estadio Deportivo Cali, Palmira"],
-      ["f6_10","Fecha 6","2026-08-23T18:10:00-05:00","Junior F.C.","Once Caldas DAF","Estadio Metropolitano, Barranquilla"],
-      // Cuadrangulares y final — fechas AÚN NO CONFIRMADAS oficialmente, quedan como
-      // referencia tentativa hasta que tengamos el fixture completo de las 19 fechas.
-      ["fpc_q1","Cuadrangulares Fecha 1","2026-11-14T17:00:00-05:00","Por definir (Grupo A)","Por definir (Grupo A)","Estadio Por Definir"],
-      ["fpc_q2","Cuadrangulares Fecha 1","2026-11-14T19:15:00-05:00","Por definir (Grupo B)","Por definir (Grupo B)","Estadio Por Definir"],
-      ["fpc_fn1","Final Ida","2026-12-06T18:00:00-05:00","Ganador Grupo A","Ganador Grupo B","Estadio Finalista 1"],
-      ["fpc_fn2","Final Vuelta","2026-12-13T18:00:00-05:00","Ganador Grupo B","Ganador Grupo A","Estadio Finalista 2"]
-    ],
+    // La malla de partidos YA NO vive aquí — se carga desde el backend (pestaña
+    // "_fixture_fpc_2026_2"), poblada corriendo cargarFixtureDesdeAPI() en
+    // Apps Script. Ver ese archivo para instrucciones de cómo (re)cargarla.
     // Los 20 equipos oficiales de Liga BetPlay DIMAYOR II-2026 (fuente: dimayor.com.co,
-    // tabla de posiciones consultada 22-ago-2026). Los nombres DEBEN coincidir EXACTO
-    // con los usados en RAW arriba.
+    // tabla de posiciones consultada 22-ago-2026).
     FLAG:{
       "América de Cali":"🔴", "Independiente Medellín":"🔴", "Deportes Tolima":"🟡",
       "Llaneros F.C.":"🟢", "Atlético Bucaramanga":"🟡", "Águilas Doradas":"🦅",
@@ -225,19 +207,25 @@ const TOURNAMENTS={
     ]
   }
   // Próximo torneo (ej. "la_liga_2026_27") se agrega como otra entrada aquí,
-  // con su propio RAW/FLAG/ESCUDOS — sin tocar nada más del archivo.
+  // con su propio FLAG/ESCUDOS — sin tocar nada más del archivo. Su malla se
+  // carga igual, vía cargarFixtureDesdeAPI(torneoId, leagueId, season) en Code.gs.
 };
 
 /* --- Estado del torneo activo del grupo, resuelto en boot() a partir de la
    llave "torneoId" guardada en la nube. Estas variables se llenan una vez que
    se conoce el torneo, con activarTorneo(). --- */
 let FIXTURE=[],FLAG={},ESCUDOS={},ALLOWED_TEAMS=[];
-function activarTorneo(id){
+async function activarTorneo(id){
   const t=TOURNAMENTS[id]||TOURNAMENTS[TOURNAMENT_DEFAULT];
-  FIXTURE=t.RAW.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio",custom:false}));
   FLAG=t.FLAG;
   ESCUDOS=t.ESCUDOS;
   ALLOWED_TEAMS=Object.keys(FLAG).concat(t.EXTRA_ALLOWED||[]).sort();
+  let partidos=[];
+  try{
+    const r=await cloudCall({action:"getFixture",torneoId:id});
+    if(r&&r.status==="success")partidos=r.partidos||[];
+  }catch(e){console.error("No se pudo cargar la malla del torneo:",e);}
+  FIXTURE=partidos.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio",custom:false}));
 }
 function flag(n){
   const archivo=ESCUDOS[n];
@@ -279,13 +267,13 @@ async function fetchAllShared(){
 }
 
 /* --- State --- */
-const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,torneoId:null,teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
+const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,torneoId:null,modoSeguimiento:"torneo",equiposSeguidos:[],teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
 const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","🎯","👑","🐺"];
 let pendingIco=AVATARS[0];
 
 function allMatches(){
   const cm=S.custom.map(c=>({id:c.id,g:c.g||"Extra",home:c.home,away:c.away,kick:c.kick,venue:c.venue||"Estadio Asignado",custom:true}));
-  const all=FIXTURE.map(m=>({...m})).concat(cm);
+  let all=FIXTURE.map(m=>({...m})).concat(cm);
   for(const m of all){
     const ov=S.teamOverrides[m.id];
     if(ov){
@@ -294,6 +282,12 @@ function allMatches(){
       if(ov.kick)m.kick=ov.kick;      // fecha/hora confirmada por el organizador
       if(ov.venue)m.venue=ov.venue;
     }
+  }
+  // Modo "equipo": el grupo entero sigue solo a su(s) equipo(s) — se filtra
+  // DESPUÉS de aplicar teamOverrides, para que un cambio de nombre en un
+  // cruce de eliminación (ej. "Por definir" -> el equipo real) también entre.
+  if(S.modoSeguimiento==="equipo"&&S.equiposSeguidos.length){
+    all=all.filter(m=>S.equiposSeguidos.includes(m.home)||S.equiposSeguidos.includes(m.away));
   }
   // Los partidos sin fecha (kick===null, "por confirmar") van al final,
   // el resto ordenado normalmente por fecha.
@@ -355,12 +349,16 @@ function renderShell(){
   const me=S.me;
   const t=TOURNAMENTS[S.torneoId]||TOURNAMENTS[TOURNAMENT_DEFAULT];
   document.title=`Predigoles · ${t.nombre}`;
+  const notaSeguimiento=(S.modoSeguimiento==="equipo"&&S.equiposSeguidos.length)
+    ?`<div class="sub" style="color:var(--mint);margin-top:2px">⚽ Este grupo sigue solo a: ${S.equiposSeguidos.map(escapeHtml).join(", ")}</div>`
+    :"";
   root.innerHTML=`
     <div class="topfijo">
       <header>
         <div class="kicker">Predigoles · ${S.groupName?escapeHtml(S.groupName):escapeHtml(t.kicker)} · Hora local</div>
         <h1>${escapeHtml(t.h1a)}<span class="yr">${escapeHtml(t.h1b)}</span></h1>
         <div class="sub">${escapeHtml(t.subtitulo)}</div>
+        ${notaSeguimiento}
         <div class="whoami">
           <span class="chip"><span class="dot"></span> Juegas como <b>${me?escapeHtml(me.ico+" "+me.name):"—"}</b></span>
           <button class="link-btn" id="changeName">cambiar</button>
@@ -775,6 +773,50 @@ async function showGroupEdit(){
   };
 }
 
+function showModoSeguimiento(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const t=TOURNAMENTS[S.torneoId]||TOURNAMENTS[TOURNAMENT_DEFAULT];
+  const equiposDisponibles=Object.keys(t.FLAG).sort();
+  const seguidosActuales=new Set(S.equiposSeguidos);
+  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+    <div class="kicker" style="color:var(--mint)">Modo Organizador</div>
+    <h2>Modo de seguimiento</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Aplica a TODO el grupo por igual — todos los jugadores ven exactamente los mismos partidos.</p>
+    <label class="field">
+      <input type="radio" name="ms_modo" value="torneo" ${S.modoSeguimiento!=="equipo"?"checked":""}> &nbsp;Seguir el torneo completo
+    </label><br>
+    <label class="field" style="margin-top:8px">
+      <input type="radio" name="ms_modo" value="equipo" ${S.modoSeguimiento==="equipo"?"checked":""}> &nbsp;Seguir solo a uno o varios equipos
+    </label>
+    <div id="ms_equipos" style="margin-top:12px;max-height:220px;overflow-y:auto;display:${S.modoSeguimiento==="equipo"?"block":"none"}">
+      ${equiposDisponibles.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px">
+        <input type="checkbox" class="ms_eq" value="${escapeHtml(eq)}" ${seguidosActuales.has(eq)?"checked":""}> ${flag(eq)} ${escapeHtml(eq)}
+      </label>`).join("")}
+    </div>
+    <div id="ms_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+    <button class="btn" id="ms_save" style="margin-top:10px">Guardar</button>
+    <button class="btn ghost" id="ms_cancel" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  document.querySelectorAll('input[name="ms_modo"]').forEach(r=>{
+    r.onchange=()=>{document.getElementById("ms_equipos").style.display=r.value==="equipo"&&r.checked?"block":"none";};
+  });
+  document.getElementById("ms_cancel").onclick=()=>ov.remove();
+  document.getElementById("ms_save").onclick=async()=>{
+    const err=document.getElementById("ms_err");
+    const modo=document.querySelector('input[name="ms_modo"]:checked').value;
+    const equipos=[...document.querySelectorAll(".ms_eq:checked")].map(cb=>cb.value);
+    if(modo==="equipo"&&!equipos.length){err.textContent="Elige al menos un equipo, o cambia a \"torneo completo\".";return;}
+    const okModo=await setJSONAuth("modoSeguimiento",modo);
+    const okEquipos=await setJSONAuth("equiposSeguidos",equipos);
+    if(!okModo||!okEquipos){err.textContent="No se pudo guardar.";return;}
+    S.modoSeguimiento=modo;S.equiposSeguidos=equipos;
+    ov.remove();renderShell();renderView();
+    toast("Modo de seguimiento actualizado ✓",false,3000);
+  };
+}
+
 /* --- Selección de Clasificados (genérico, sirve para cualquier torneo con fases de eliminación) --- */
 function editTeamName(id,side,current){
   const old=document.getElementById("ovl");if(old)old.remove();
@@ -925,6 +967,7 @@ function renderResultados(c){
   
   let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · Configura los clasificados con ✏️, la fecha/hora/sede con 📅 (solo mientras no tenga resultado), e ingresa marcadores.</div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
+  html+=`<div class="addbox" style="border-color:rgba(54,224,191,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showModoSeguimiento()" style="background:var(--raise);color:var(--mint)">⚽ Modo de seguimiento (equipo o torneo completo)</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showBettingConfig()" style="background:var(--raise);color:var(--gold)">💰 Configurar premios / inscripción</button></div>`;
   
@@ -1206,6 +1249,8 @@ async function refreshShared(){
     S.roster=roster;S.custom=custom;
     S.live=(await getJSON("live",true))||{};
     S.betting=(await getJSON("betting",true))||S.betting;
+    S.modoSeguimiento=(await getJSON("modoSeguimiento",true))||S.modoSeguimiento;
+    S.equiposSeguidos=(await getJSON("equiposSeguidos",true))||S.equiposSeguidos;
     const resChanged=JSON.stringify(results)!==JSON.stringify(S.results);
     S.results=results;
     const preds={};
@@ -1336,7 +1381,14 @@ function showCrearGrupo(){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
-  const torneoOptions=Object.keys(TOURNAMENTS).map(id=>`<option value="${id}">${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
+  const torneoIds=Object.keys(TOURNAMENTS);
+  const torneoOptions=torneoIds.map(id=>`<option value="${id}">${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
+  function listaEquiposHtml(torneoId){
+    const equipos=Object.keys((TOURNAMENTS[torneoId]||{}).FLAG||{}).sort();
+    return equipos.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px">
+      <input type="checkbox" class="cg_eq" value="${escapeHtml(eq)}"> ${escapeHtml(eq)}
+    </label>`).join("");
+  }
   ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
     <div class="kicker" style="color:var(--gold)">Panel Central</div>
     <h2>Crear grupo</h2>
@@ -1346,7 +1398,15 @@ function showCrearGrupo(){
     <input class="input" id="cg_nombre" maxlength="30" placeholder="Ej: Polla Oficina Cliente X">
     <label class="field" style="margin-top:12px">Torneo</label>
     <select class="select-popup" id="cg_torneo">${torneoOptions}</select>
-    <label class="field">Nombre del administrador del grupo</label>
+    <label class="field">¿Qué va a seguir este grupo?</label>
+    <label class="field" style="font-weight:400">
+      <input type="radio" name="cg_modo" value="torneo" checked> &nbsp;El torneo completo
+    </label><br>
+    <label class="field" style="font-weight:400;margin-top:6px">
+      <input type="radio" name="cg_modo" value="equipo"> &nbsp;Solo uno o varios equipos
+    </label>
+    <div id="cg_equipos" style="margin-top:10px;max-height:180px;overflow-y:auto;display:none">${listaEquiposHtml(torneoIds[0])}</div>
+    <label class="field" style="margin-top:14px">Nombre del administrador del grupo</label>
     <input class="input" id="cg_admin_nombre" maxlength="60" placeholder="Nombre de contacto">
     <label class="field" style="margin-top:10px">Celular del administrador</label>
     <input class="input" id="cg_admin_cel" maxlength="20" placeholder="Ej: 3001234567">
@@ -1358,21 +1418,30 @@ function showCrearGrupo(){
     <button class="btn" id="cg_crear" style="margin-top:10px">Crear</button>
     <button class="btn ghost" id="cg_cancelar" style="margin-top:10px">Cancelar</button>
   </div>`;
+  document.getElementById("cg_torneo").onchange=(e)=>{
+    document.getElementById("cg_equipos").innerHTML=listaEquiposHtml(e.target.value);
+  };
+  document.querySelectorAll('input[name="cg_modo"]').forEach(r=>{
+    r.onchange=()=>{document.getElementById("cg_equipos").style.display=r.value==="equipo"&&r.checked?"block":"none";};
+  });
   document.getElementById("cg_cancelar").onclick=()=>ov.remove();
   document.getElementById("cg_crear").onclick=async()=>{
     const err=document.getElementById("cg_err");
     const grupoId=document.getElementById("cg_id").value.trim();
     const nombreGrupo=document.getElementById("cg_nombre").value.trim();
     const torneoId=document.getElementById("cg_torneo").value;
+    const modoSeguimiento=document.querySelector('input[name="cg_modo"]:checked').value;
+    const equiposSeguidos=[...document.querySelectorAll(".cg_eq:checked")].map(cb=>cb.value);
     const nombreAdmin=document.getElementById("cg_admin_nombre").value.trim();
     const celularAdmin=document.getElementById("cg_admin_cel").value.trim();
     const correoAdmin=document.getElementById("cg_admin_correo").value.trim();
     const pin=document.getElementById("cg_pin").value.trim();
     if(!grupoId||!/^[a-zA-Z0-9_-]{1,40}$/.test(grupoId)){err.textContent="ID de grupo inválido (solo letras, números, guiones).";return;}
     if(!nombreGrupo){err.textContent="Falta el nombre del grupo.";return;}
+    if(modoSeguimiento==="equipo"&&!equiposSeguidos.length){err.textContent="Elige al menos un equipo, o marca \"el torneo completo\".";return;}
     if(pin&&!/^\d{4}$/.test(pin)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
     document.getElementById("cg_crear").disabled=true;
-    const r=await cloudCall({action:"adminProvisionarGrupo",masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,nombreAdmin,celularAdmin,correoAdmin,pin});
+    const r=await cloudCall({action:"adminProvisionarGrupo",masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pin});
     if(r&&r.status==="success"){
       ov.remove();
       mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo);
@@ -1420,7 +1489,9 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
     S.organizerPinHash=S.organizer?localStorage.getItem("pg_pinhash_"+TAB):null;
     await fetchAllShared();
     S.torneoId=(await getJSON("torneoId",true))||TOURNAMENT_DEFAULT; // grupos anteriores a este catálogo (ej. JorgeLozano) caen al torneo por defecto
-    activarTorneo(S.torneoId);
+    await activarTorneo(S.torneoId);
+    S.modoSeguimiento=(await getJSON("modoSeguimiento",true))||"torneo";
+    S.equiposSeguidos=(await getJSON("equiposSeguidos",true))||[];
     S.results=(await getJSON("results",true))||{};
     S.custom=(await getJSON("custom",true))||[];
     S.roster=(await getJSON("roster",true))||[];
