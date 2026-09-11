@@ -205,10 +205,34 @@ const TOURNAMENTS={
       "Por definir (B1)","Por definir (B2)","Por definir (B3)","Por definir (B4)",
       "Ganador Grupo A","Ganador Grupo B"
     ]
+  },
+  "la_liga_2026_27":{
+    nombre:"La Liga 2026-27",
+    kicker:"La Liga · España",
+    h1a:"Rumbo al ",h1b:"Título",
+    subtitulo:"Acierta el resultado y clava el marcador en la liga española.",
+    // Sin escudos ni emoji propios todavía — cae al ⚽ de respaldo automáticamente
+    // en cada equipo. Se pueden agregar después, igual que se hizo con Colombia
+    // (FLAG/ESCUDOS aquí + imágenes en /escudos/ en la raíz del repo).
+    FLAG:{},
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[]
+  },
+  "champions_2026_27":{
+    nombre:"UEFA Champions League 2026-27",
+    kicker:"Champions League",
+    h1a:"Rumbo a la ",h1b:"Final",
+    subtitulo:"Acierta el resultado y clava el marcador en la máxima competencia de Europa.",
+    FLAG:{},
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[
+      "Por definir (Octavos)","Por definir (Cuartos)","Por definir (Semis)",
+      "Ganador Octavos","Ganador Cuartos","Ganador Semis"
+    ]
   }
-  // Próximo torneo (ej. "la_liga_2026_27") se agrega como otra entrada aquí,
-  // con su propio FLAG/ESCUDOS — sin tocar nada más del archivo. Su malla se
-  // carga igual, vía cargarFixtureDesdeAPI(torneoId, leagueId, season) en Code.gs.
+  // Próximo torneo se agrega como otra entrada aquí, con su propio FLAG/ESCUDOS
+  // — sin tocar nada más del archivo. Su malla se carga igual, vía
+  // cargarFixtureDesdeAPI(torneoId, leagueId, season) en Code.gs.
 };
 
 /* --- Estado del torneo activo del grupo, resuelto en boot() a partir de la
@@ -336,6 +360,18 @@ function cd(diff){
   return{t:`${mm}m ${String(s).padStart(2,"0")}s`,soon:true};
 }
 
+/* El pronóstico cierra a las 11:59:59pm (hora Colombia) del día ANTERIOR al
+   partido — no a la hora exacta del pitazo inicial. El truco de restar/sumar
+   5h es el mismo que usamos para el editor de fecha: nos deja calcular sobre
+   los dígitos de la hora de Colombia sin depender de en qué huso horario esté
+   el navegador de quien está mirando la app. */
+function calcularLimite(kickEpoch){
+  if(kickEpoch==null)return null;
+  const d=new Date(kickEpoch-5*60*60*1000);
+  const limite=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-1,23,59,59,999));
+  return limite.getTime()+5*60*60*1000;
+}
+
 function _hashPin(pin){let h=0;for(let i=0;i<pin.length;i++){h=((h<<5)-h)+pin.charCodeAt(i);h|=0;}return"ph_"+Math.abs(h).toString(36);}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
@@ -456,7 +492,7 @@ function tiempoDesde(iso){
 }
 function matchCardHtml(m){
   const sinFecha=m.kick==null;
-  const locked=!sinFecha&&S.now>=m.kick;
+  const locked=!sinFecha&&S.now>=calcularLimite(m.kick);
   const p=S.predsMe[m.id]||{};
   const res=S.results[m.id];
   const live=!res?S.live[m.id]:null;
@@ -541,7 +577,7 @@ function renderPartidos(c){
   html+=`<div class="rules"><div><b>Cómo se ganan los puntos</b></div>
     <div style="margin-top:8px"><span class="pill">+1</span> si aciertas quién gana (o el empate).</div>
     <div><span class="pill">+2</span> extra si además clavas el marcador exacto. <span style="color:var(--muted)">(máximo <b style="color:var(--gold)">3</b> por partido)</span></div>
-    <div style="margin-top:8px">Cada partido se cierra a su hora de inicio. Los partidos "por confirmar" quedan abiertos hasta que el organizador defina su fecha.</div></div>`;
+    <div style="margin-top:8px">Cada partido cierra a las 11:59 p.m. del día ANTERIOR al partido — no a la hora exacta del pitazo. Los partidos "por confirmar" quedan abiertos hasta que el organizador defina su fecha.</div></div>`;
   c.innerHTML=html;
 
   matchesById={};allMatches().forEach(x=>matchesById[x.id]=x);
@@ -580,7 +616,7 @@ function handleInput(id){
 function paintFoot(m){
   if(!m)return;
   const e=matchEls[m.id];if(!e||!e.foot)return;
-  const locked=m.kick!=null&&S.now>=m.kick,res=S.results[m.id],p=S.predsMe[m.id];
+  const locked=m.kick!=null&&S.now>=calcularLimite(m.kick),res=S.results[m.id],p=S.predsMe[m.id];
   const sinGuardar=S.dirty.has(m.id); // escrito pero todavía no confirmado por el servidor
   let left="",right="";
   if(res){
@@ -619,7 +655,7 @@ function updateSaveBar(){
 async function savePreds(){
   const byId={};allMatches().forEach(m=>byId[m.id]=m);
   let dropped=0;
-  for(const id of[...S.dirty]){const m=byId[id];if(m&&m.kick!=null&&S.now>=m.kick){dropped++;S.dirty.delete(id);}}
+  for(const id of[...S.dirty]){const m=byId[id];if(m&&m.kick!=null&&S.now>=calcularLimite(m.kick)){dropped++;S.dirty.delete(id);}}
   const cantidadEnEstaAccion=S.dirty.size; // lo que de verdad se está enviando AHORA, no el histórico
 
   if(cantidadEnEstaAccion===0){
@@ -792,7 +828,7 @@ function showModoSeguimiento(){
     </label>
     <div id="ms_equipos" style="margin-top:12px;max-height:220px;overflow-y:auto;display:${S.modoSeguimiento==="equipo"?"block":"none"}">
       ${equiposDisponibles.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px">
-        <input type="checkbox" class="ms_eq" value="${escapeHtml(eq)}" ${seguidosActuales.has(eq)?"checked":""}> ${flag(eq)} ${escapeHtml(eq)}
+        <input type="checkbox" class="ms_eq" value="${escapeHtml(eq)}" ${seguidosActuales.has(eq)?"checked":""}> ${escapeHtml(eq)}
       </label>`).join("")}
     </div>
     <div id="ms_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
@@ -1230,9 +1266,10 @@ function tick(){
       if(e.hi&&e.hi.disabled){e.hi.disabled=false;e.ai.disabled=false;paintFoot(m);}
       continue;
     }
-    const diff=m.kick-S.now,info=cd(diff);
+    const limite=calcularLimite(m.kick);
+    const diff=limite-S.now,info=cd(diff);
     if(e.cd){if(info){e.cd.textContent="Cierra en "+info.t;e.cd.className="cd"+(info.soon?" soon":"");}else{e.cd.textContent="Cerrado";e.cd.className="cd closed";}}
-    const locked=S.now>=m.kick;
+    const locked=S.now>=limite;
     if(e.hi&&e.hi.disabled!==locked){e.hi.disabled=locked;e.ai.disabled=locked;paintFoot(m);}
   }
 }
@@ -1382,7 +1419,7 @@ function showCrearGrupo(){
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
   const torneoIds=Object.keys(TOURNAMENTS);
-  const torneoOptions=torneoIds.map(id=>`<option value="${id}">${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
+  const torneoOptions=torneoIds.map(id=>`<option value="${id}" ${id===TOURNAMENT_DEFAULT?"selected":""}>${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
   function listaEquiposHtml(torneoId){
     const equipos=Object.keys((TOURNAMENTS[torneoId]||{}).FLAG||{}).sort();
     return equipos.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px">
@@ -1405,7 +1442,7 @@ function showCrearGrupo(){
     <label class="field" style="font-weight:400;margin-top:6px">
       <input type="radio" name="cg_modo" value="equipo"> &nbsp;Solo uno o varios equipos
     </label>
-    <div id="cg_equipos" style="margin-top:10px;max-height:180px;overflow-y:auto;display:none">${listaEquiposHtml(torneoIds[0])}</div>
+    <div id="cg_equipos" style="margin-top:10px;max-height:180px;overflow-y:auto;display:none">${listaEquiposHtml(TOURNAMENT_DEFAULT)}</div>
     <label class="field" style="margin-top:14px">Nombre del administrador del grupo</label>
     <input class="input" id="cg_admin_nombre" maxlength="60" placeholder="Nombre de contacto">
     <label class="field" style="margin-top:10px">Celular del administrador</label>
