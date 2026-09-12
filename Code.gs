@@ -1,0 +1,691 @@
+/**
+ * PREDIGOLES — Backend multi-cliente (Apps Script)
+ * ---------------------------------------------------
+ * Cada "cliente vendido" vive en su propia pestaña (kv1, kv2, kv3...) dentro
+ * de ESTA MISMA hoja de cálculo. El frontend manda qué pestaña usar en cada
+ * request (campo "tab"). Si la pestaña no existe todavía, se crea sola.
+ */
+
+/* ---------- CONFIGURACIÓN ---------- */
+// Token de API-Football (api-football.com / api-sports.io). Configúralo en
+// Editor de Apps Script → ⚙️ Configuración del proyecto → Propiedades de
+// secuencia de comandos → nombre: APIFOOTBALL_KEY, valor: tu token real.
+const APIFOOTBALL_KEY = PropertiesService.getScriptProperties().getProperty("APIFOOTBALL_KEY") || "";
+
+/* ---------- ADMINISTRADOR CENTRAL (César) ---------- */
+// El PIN maestro NUNCA vive en una hoja — solo en Propiedades del proyecto, así
+// que jamás puede salir por getAll ni por ningún otro camino de lectura normal.
+// Para configurarlo: abre la app publicada, consola del navegador (F12), corre
+// _hashPin("tuPinMaestro") y pega el resultado aquí:
+// ⚙️ Configuración del proyecto → Propiedades de secuencia de comandos →
+// nombre: MASTER_PIN_HASH, valor: el hash que te dio la consola.
+const MASTER_PIN_HASH = PropertiesService.getScriptProperties().getProperty("MASTER_PIN_HASH") || "";
+
+const MASTER_SHEET_NAME = "_grupos_maestro";
+const MASTER_HEADER = ["grupoId","nombreGrupo","nombreAdmin","celularAdmin","correoAdmin","torneoId","fechaCreacion","estadoPago"];
+
+function _hashPinGS(pin) {
+  // Debe ser IDÉNTICO al _hashPin() del frontend, para que los hashes coincidan.
+  let h = 0;
+  for (let i = 0; i < String(pin).length; i++) { h = ((h << 5) - h) + String(pin).charCodeAt(i); h |= 0; }
+  return "ph_" + Math.abs(h).toString(36);
+}
+function checkMasterAuth(pinEnviado) {
+  if (!MASTER_PIN_HASH) return { status: "error", message: "PIN maestro no configurado en el servidor todavía." };
+  if (!pinEnviado || pinEnviado !== MASTER_PIN_HASH) return { status: "error", message: "PIN maestro inválido." };
+  return null;
+}
+function getOrCreateMasterSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(MASTER_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(MASTER_SHEET_NAME);
+    sheet.appendRow(MASTER_HEADER);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+const APIFOOTBALL_BASE = "https://v3.football.api-sports.io";
+
+// Liga y temporada usadas HOY por la sincronización de resultados en vivo
+// (_sincronizar). Si más adelante corres varios torneos en vivo a la vez,
+// esto necesitaría generalizarse — por ahora sincroniza uno solo.
+// ⚠️ Confirmar el ID de cada liga antes de usar (ver buscarLeagueIdColombia()
+// más abajo, o el buscador equivalente para otras ligas).
+const LEAGUE_ID = 239; // Liga BetPlay Colombia — confirmado
+const SEASON = 2026;
+const TORNEO_ACTIVO_SYNC = "fpc_2026_2"; // qué malla (ver _fixture_<id>) usa _sincronizar()
+
+const TAB_NAME_RE = /^[a-zA-Z0-9_-]{1,40}$/;
+const HEADER = ["key", "value"];
+
+/* ---------- Malla de partidos por torneo (cargue vía API) ----------
+   Cada torneo tiene su propia hoja "_fixture_<torneoId>" con una sola llave
+   "partidos" que guarda el arreglo completo en JSON. El frontend la lee con
+   la acción pública "getFixture" (no requiere PIN — el calendario no es
+   información sensible). Para (re)cargar la malla completa de un torneo:
+
+   1. Abre este proyecto en el editor de Apps Script.
+   2. En la barra de funciones (arriba), selecciona "cargarFixtureDesdeAPI".
+   3. Edita la línea de abajo con el torneoId/liga/temporada que quieras, y
+      corre la función (▶). Revisa el log para confirmar cuántos partidos trajo.
+   4. Repite cuando quieras refrescar (ej. cuando Dimayor confirme fechas
+      nuevas) — sobrescribe la malla completa, pero NUNCA toca los ajustes
+      manuales que cada grupo haya hecho con el botón 📅 (esos viven aparte,
+      en la pestaña de cada grupo, no aquí).
+*/
+function getOrCreateFixtureTab(torneoId) {
+  const nombreTab = "_fixture_" + torneoId;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(nombreTab);
+  if (!sheet) {
+    sheet = ss.insertSheet(nombreTab);
+    sheet.appendRow(HEADER);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function cargarFixtureDesdeAPI(torneoId, leagueId, season) {
+  if (!APIFOOTBALL_KEY) { Logger.log("Falta configurar APIFOOTBALL_KEY en Propiedades del proyecto."); return; }
+  if (!torneoId || !leagueId || !season) { Logger.log("Faltan parámetros: torneoId, leagueId y season son obligatorios."); return; }
+
+  const url = APIFOOTBALL_BASE + "/fixtures?league=" + leagueId + "&season=" + season;
+  const resp = UrlFetchApp.fetch(url, { headers: { "x-apisports-key": APIFOOTBALL_KEY }, muteHttpExceptions: true });
+  const code = resp.getResponseCode();
+  if (code !== 200) { Logger.log("Error API (HTTP " + code + ")"); return; }
+  const parsed = JSON.parse(resp.getContentText());
+  if (parsed.errors && Object.keys(parsed.errors).length) { Logger.log("Error API: " + JSON.stringify(parsed.errors)); return; }
+
+  const partidos = (parsed.response || []).map(function (m) {
+    // status.short "TBD" = fecha/hora todavía no confirmada por la liga.
+    const kick = m.fixture.status.short === "TBD" ? "" : m.fixture.date;
+    const venue = (m.fixture.venue && m.fixture.venue.name)
+      ? m.fixture.venue.name + (m.fixture.venue.city ? ", " + m.fixture.venue.city : "")
+      : "Estadio por confirmar";
+    return [
+      "af_" + m.fixture.id,
+      String(m.league.round || ""),
+      kick,
+      traducirEquipo(m.teams.home.name),
+      traducirEquipo(m.teams.away.name),
+      venue,
+    ];
+  });
+
+  const tab = getOrCreateFixtureTab(torneoId);
+  setKey(tab, "partidos", JSON.stringify(partidos));
+  Logger.log("Cargados " + partidos.length + " partidos para \"" + torneoId + "\" (liga " + leagueId + ", temporada " + season + ").");
+}
+
+/* api-football.com a veces usa nombres oficiales ligeramente distintos a los
+   nuestros (ej. sin "F.C.", o con variantes de acento). Si la sincronización
+   reporta partidos "sin mapear" que sí están jugándose, es casi seguro que el
+   nombre que devuelve la API no coincide exacto — agrégalo aquí. */
+const TEAM_DICT = {
+  "America de Cali": "América de Cali",
+  "Independiente Medellin": "Independiente Medellín",
+  "Deportes Tolima": "Deportes Tolima",
+  "Llaneros": "Llaneros F.C.",
+  "Atletico Bucaramanga": "Atlético Bucaramanga",
+  "Aguilas Doradas": "Águilas Doradas",
+  "Deportivo Cali": "Deportivo Cali",
+  "Millonarios": "Millonarios F.C.",
+  "Once Caldas": "Once Caldas DAF",
+  "Fortaleza CEIF": "Fortaleza",
+  "Independiente Santa Fe": "Independiente Santa Fe",
+  "Internacional": "Internacional de Bogotá",
+  "Jaguares de Cordoba": "Jaguares F.C.",
+  "Atletico Nacional": "Atlético Nacional",
+  "Cucuta Deportivo": "Cúcuta Deportivo",
+  "Deportivo Pereira": "Deportivo Pereira",
+  "Alianza": "Alianza Valledupar F.C.",
+  "Junior": "Junior F.C.",
+  "Deportivo Pasto": "Deportivo Pasto",
+  "Boyaca Chico": "Boyacá Chicó F.C.",
+};
+
+function doPost(e) {
+  let body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return jsonOut({ status: "error", message: "JSON inválido" });
+  }
+
+  const action = body.action;
+
+  // --- Acciones del Administrador Central: se resuelven ANTES de tocar
+  // cualquier lógica de "tenant" (grupo), y nunca dependen de body.tab. ---
+  if (action === "adminListarGrupos" || action === "adminProvisionarGrupo" || action === "adminActualizarPago" || action === "adminResetearPin") {
+    return manejarAccionMaestra(action, body);
+  }
+
+  // Lectura pública de la malla de un torneo (no es información sensible,
+  // no requiere PIN). Se resuelve aparte porque targetea deliberadamente una
+  // pestaña "_fixture_<torneoId>", que el chequeo de nombre reservado de abajo
+  // bloquearía si pasara por el camino normal de "tab".
+  if (action === "getFixture") {
+    const torneoId = sanitizeTab(String(body.torneoId || ""));
+    if (!torneoId) return jsonOut({ status: "error", message: "torneoId inválido." });
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("_fixture_" + torneoId);
+    if (!sheet) return jsonOut({ status: "success", partidos: [] });
+    const raw = getValueFromSheet(sheet, "partidos");
+    let partidos = [];
+    try { partidos = raw ? JSON.parse(raw) : []; } catch (e) {}
+    return jsonOut({ status: "success", partidos: partidos });
+  }
+
+  let tabRaw = body.tab || "kv1";
+  const tab = sanitizeTab(String(tabRaw));
+  if (!tab) return jsonOut({ status: "error", message: "tab inválido o vacío" });
+  if (tab === MASTER_SHEET_NAME || tab.indexOf("_") === 0) {
+    return jsonOut({ status: "error", message: "Nombre de grupo reservado." });
+  }
+
+  // Lectura pura y la pestaña ya existe: evitamos el lock global.
+  if (action === "getAll") {
+    const ssRapido = SpreadsheetApp.getActiveSpreadsheet();
+    const hojaExistente = ssRapido.getSheetByName(tab);
+    if (hojaExistente) return jsonOut(sanitizeGetAllOutput(getAllKV(hojaExistente)));
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateTab(tab);
+
+    if (action === "set") {
+      const key = String(body.key);
+      if (isProtectedKey(key)) {
+        const authError = checkAdminAuth(sheet, body.pin);
+        if (authError) return jsonOut(authError);
+      }
+      setKey(sheet, key, body.value == null ? "" : String(body.value));
+      return jsonOut({ status: "success" });
+    }
+
+    if (action === "getAll") {
+      return jsonOut(sanitizeGetAllOutput(getAllKV(sheet)));
+    }
+
+    if (action === "joinRoster") {
+      const player = body.player;
+      if (!player || !player.id) return jsonOut({ status: "error", message: "player inválido" });
+
+      let roster = [];
+      const raw = getValueFromSheet(sheet, "roster");
+      try { roster = raw ? JSON.parse(raw) : []; } catch (e) { roster = []; }
+
+      const idx = roster.findIndex(function (p) { return p.id === player.id; });
+      if (idx >= 0) {
+        roster[idx] = player;
+      } else {
+        const nombreTomado = roster.some(function (p) {
+          return p.id !== player.id && String(p.name).trim().toLowerCase() === String(player.name).trim().toLowerCase();
+        });
+        if (nombreTomado) {
+          return jsonOut({ status: "name_taken", roster: roster });
+        }
+        roster.push(player);
+      }
+      setKey(sheet, "roster", JSON.stringify(roster));
+      return jsonOut({ status: "success", roster: roster });
+    }
+
+    if (action === "syncNow") {
+      const resultado = _sincronizar();
+      return jsonOut({ status: "success", sincronizados: resultado.sincronizados, enVivo: resultado.enVivo, total: resultado.total, sinMapear: resultado.sinMapear, error: resultado.error || null });
+    }
+
+    return jsonOut({ status: "error", message: "acción desconocida: " + action });
+  } catch (err) {
+    return jsonOut({ status: "error", message: String(err) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ---------- Acciones del Administrador Central ---------- */
+function manejarAccionMaestra(action, body) {
+  const authErr = checkMasterAuth(body.masterPin);
+  if (authErr) return jsonOut(authErr);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (action === "adminListarGrupos") {
+      const sheet = getOrCreateMasterSheet();
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) return jsonOut({ status: "success", grupos: [] });
+      const data = sheet.getRange(2, 1, lastRow - 1, MASTER_HEADER.length).getValues();
+      const grupos = data.map(function (row) {
+        const obj = {};
+        MASTER_HEADER.forEach(function (col, i) { obj[col] = row[i]; });
+        return obj;
+      });
+      return jsonOut({ status: "success", grupos: grupos });
+    }
+
+    if (action === "adminProvisionarGrupo") {
+      const grupoId = sanitizeTab(String(body.grupoId || ""));
+      if (!grupoId) return jsonOut({ status: "error", message: "ID de grupo inválido (solo letras, números y guiones)." });
+      if (grupoId === MASTER_SHEET_NAME || grupoId.indexOf("_") === 0) {
+        return jsonOut({ status: "error", message: "Ese nombre está reservado, elige otro." });
+      }
+      const nombreGrupo = String(body.nombreGrupo || "").trim();
+      if (!nombreGrupo) return jsonOut({ status: "error", message: "Falta el nombre del grupo." });
+      const torneoId = String(body.torneoId || "").trim();
+      if (!torneoId) return jsonOut({ status: "error", message: "Falta el torneo." });
+
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      let sheet = ss.getSheetByName(grupoId);
+      if (sheet) {
+        const yaConfigurado = getValueFromSheet(sheet, "adminPin");
+        if (yaConfigurado) {
+          return jsonOut({ status: "error", message: "Ese grupo ya existe y ya está configurado — no se puede volver a provisionar (evita borrar datos activos)." });
+        }
+      } else {
+        sheet = ss.insertSheet(grupoId);
+        sheet.appendRow(HEADER);
+        sheet.setFrozenRows(1);
+      }
+
+      let pin = String(body.pin || "").trim();
+      if (!pin) pin = String(Math.floor(1000 + Math.random() * 9000)); // genera uno de 4 dígitos si no se especificó
+      if (!/^\d{4}$/.test(pin)) return jsonOut({ status: "error", message: "El PIN debe ser de 4 dígitos." });
+
+      setKey(sheet, "groupName", nombreGrupo);
+      setKey(sheet, "adminPin", _hashPinGS(pin));
+      setKey(sheet, "torneoId", torneoId);
+      const modoSeguimiento = (body.modoSeguimiento === "equipo") ? "equipo" : "torneo";
+      setKey(sheet, "modoSeguimiento", modoSeguimiento);
+      setKey(sheet, "equiposSeguidos", JSON.stringify(Array.isArray(body.equiposSeguidos) ? body.equiposSeguidos : []));
+
+      const masterSheet = getOrCreateMasterSheet();
+      masterSheet.appendRow([
+        grupoId, nombreGrupo,
+        String(body.nombreAdmin || ""), String(body.celularAdmin || ""), String(body.correoAdmin || ""),
+        torneoId, new Date().toISOString(), String(body.estadoPago || "Pendiente")
+      ]);
+
+      return jsonOut({ status: "success", grupoId: grupoId, pin: pin });
+    }
+
+    if (action === "adminActualizarPago") {
+      const grupoId = String(body.grupoId || "");
+      const estadoPago = String(body.estadoPago || "");
+      if (!grupoId || !estadoPago) return jsonOut({ status: "error", message: "Faltan datos." });
+      const masterSheet = getOrCreateMasterSheet();
+      const lastRow = masterSheet.getLastRow();
+      if (lastRow < 2) return jsonOut({ status: "error", message: "No hay grupos registrados." });
+      const ids = masterSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (ids[i][0] === grupoId) {
+          masterSheet.getRange(i + 2, MASTER_HEADER.indexOf("estadoPago") + 1).setValue(estadoPago);
+          return jsonOut({ status: "success" });
+        }
+      }
+      return jsonOut({ status: "error", message: "Grupo no encontrado en el registro maestro." });
+    }
+
+    if (action === "adminResetearPin") {
+      const grupoId = sanitizeTab(String(body.grupoId || ""));
+      if (!grupoId) return jsonOut({ status: "error", message: "ID de grupo inválido." });
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(grupoId);
+      if (!sheet) return jsonOut({ status: "error", message: "Ese grupo no existe." });
+      let pin = String(body.pin || "").trim();
+      if (!pin) pin = String(Math.floor(1000 + Math.random() * 9000));
+      if (!/^\d{4}$/.test(pin)) return jsonOut({ status: "error", message: "El PIN debe ser de 4 dígitos." });
+      setKey(sheet, "adminPin", _hashPinGS(pin));
+      return jsonOut({ status: "success", grupoId: grupoId, pin: pin });
+    }
+
+    return jsonOut({ status: "error", message: "Acción maestra desconocida." });
+  } catch (err) {
+    return jsonOut({ status: "error", message: String(err) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function doGet(e) {
+  const log = cronSincronizarResultados();
+  return ContentService.createTextOutput(log).setMimeType(ContentService.MimeType.TEXT);
+}
+
+/* ---------- SEGURIDAD ---------- */
+
+const PROTECTED_KEYS = ["results", "betting", "groupName", "adminPin", "teamOverrides", "modoSeguimiento", "equiposSeguidos"];
+function isProtectedKey(key) {
+  return PROTECTED_KEYS.indexOf(key) !== -1;
+}
+
+function checkAdminAuth(sheet, pinEnviado) {
+  const adminPinGuardado = getValueFromSheet(sheet, "adminPin");
+  // Ya NO existe "primer set libre": todo grupo nace provisionado por el
+  // administrador central (acción adminProvisionarGrupo), nunca por
+  // autoconfiguración espontánea de quien abra el link primero.
+  if (!adminPinGuardado || !pinEnviado || pinEnviado !== adminPinGuardado) {
+    return { status: "error", message: "PIN de administrador inválido, ausente, o el grupo aún no ha sido creado por el administrador central." };
+  }
+  return null;
+}
+
+/* "Pagos" fue retirado como funcionalidad (el producto es peer-to-peer: cada
+   jugador le transfiere directo al ganador, no hay nada que el admin recaude).
+   Este filtro se deja como limpieza defensiva por si algún grupo viejo todavía
+   tiene datos de "pagos" guardados de antes — nunca deben salir en getAll. */
+function sanitizeGetAllOutput(data) {
+  if (data && ("pagos" in data)) delete data.pagos;
+  return data;
+}
+
+function normalizar(s) {
+  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function traducirEquipo(nombreAPI) {
+  if (TEAM_DICT[nombreAPI]) return TEAM_DICT[nombreAPI];
+  return nombreAPI;
+}
+
+/**
+ * LIMPIEZA ÚNICA: fusiona jugadores duplicados (mismo nombre, IDs distintos).
+ */
+function mergeDuplicatePlayers() {
+  const tenantSheets = getAllTenantSheets();
+  const reporte = [];
+
+  tenantSheets.forEach(function (sheet) {
+    const rosterRaw = getValueFromSheet(sheet, "roster");
+    let roster = [];
+    try { roster = rosterRaw ? JSON.parse(rosterRaw) : []; } catch (e) { return; }
+    if (!roster.length) return;
+
+    const grupos = {};
+    roster.forEach(function (p) {
+      const key = normalizar(p.name);
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(p);
+    });
+
+    let cambiosEnSheet = false;
+    const nuevoRoster = [];
+
+    Object.keys(grupos).forEach(function (key) {
+      const grupo = grupos[key];
+      if (grupo.length === 1) { nuevoRoster.push(grupo[0]); return; }
+
+      let mejor = grupo[0], mejorCount = -1;
+      grupo.forEach(function (p) {
+        const predsRaw = getValueFromSheet(sheet, "preds_" + p.id);
+        let count = 0;
+        try { count = predsRaw ? Object.keys(JSON.parse(predsRaw)).length : 0; } catch (e) {}
+        if (count > mejorCount) { mejorCount = count; mejor = p; }
+      });
+
+      const predsGanadorRaw = getValueFromSheet(sheet, "preds_" + mejor.id);
+      let predsGanador = {};
+      try { predsGanador = predsGanadorRaw ? JSON.parse(predsGanadorRaw) : {}; } catch (e) {}
+
+      grupo.forEach(function (p) {
+        if (p.id === mejor.id) return;
+        const predsPerdedorRaw = getValueFromSheet(sheet, "preds_" + p.id);
+        let predsPerdedor = {};
+        try { predsPerdedor = predsPerdedorRaw ? JSON.parse(predsPerdedorRaw) : {}; } catch (e) {}
+        Object.keys(predsPerdedor).forEach(function (mid) {
+          if (!(mid in predsGanador)) predsGanador[mid] = predsPerdedor[mid];
+        });
+      });
+      setKey(sheet, "preds_" + mejor.id, JSON.stringify(predsGanador));
+      nuevoRoster.push(mejor);
+      cambiosEnSheet = true;
+      reporte.push(sheet.getName() + ": fusionó " + grupo.length + " registros de \"" + mejor.name + "\" en " + mejor.id);
+    });
+
+    if (cambiosEnSheet) setKey(sheet, "roster", JSON.stringify(nuevoRoster));
+  });
+
+  const out = reporte.length ? reporte.join("\n") : "No se encontraron duplicados.";
+  Logger.log(out);
+  return out;
+}
+
+/**
+ * Sincroniza resultados y marcadores en vivo desde api-football.com.
+ * Trae TODA la temporada de la liga en una sola llamada (barato en cuota:
+ * 1 request, sin importar cuántos partidos devuelva) y filtra localmente.
+ */
+function _sincronizar() {
+  const fixtureTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("_fixture_" + TORNEO_ACTIVO_SYNC);
+  const fixtureRaw = fixtureTab ? getValueFromSheet(fixtureTab, "partidos") : null;
+  let fixtureList = [];
+  try { fixtureList = fixtureRaw ? JSON.parse(fixtureRaw) : []; } catch (e) {}
+  // Convierte del formato de fila [id, fase, kick, home, away, venue] al {id, home, away}
+  // que el resto de esta función ya sabía usar (así no hubo que reescribir toda la lógica).
+  const FIXTURE_ACTUAL = fixtureList.map(function (r) { return { id: r[0], home: r[3], away: r[4] }; });
+
+  if (!APIFOOTBALL_KEY) {
+    return { error: "Falta configurar APIFOOTBALL_KEY en Propiedades del proyecto.", sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+  }
+  if (!LEAGUE_ID) {
+    return { error: "Falta confirmar LEAGUE_ID.", sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+  }
+  if (!FIXTURE_ACTUAL.length) {
+    return { error: "La malla de \"" + TORNEO_ACTIVO_SYNC + "\" está vacía — corre cargarFixtureDesdeAPI() primero.", sincronizados: 0, total: 0, sinMapear: [], clientes: [] };
+  }
+
+  let apiMatches;
+  try {
+    const url = APIFOOTBALL_BASE + "/fixtures?league=" + LEAGUE_ID + "&season=" + SEASON;
+    const resp = UrlFetchApp.fetch(url, { headers: { "x-apisports-key": APIFOOTBALL_KEY }, muteHttpExceptions: true });
+    const code = resp.getResponseCode();
+    if (code !== 200) {
+      return { error: "Error API (HTTP " + code + ")", sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+    }
+    const parsed = JSON.parse(resp.getContentText());
+    if (parsed.errors && Object.keys(parsed.errors).length) {
+      return { error: "API respondió con error: " + JSON.stringify(parsed.errors), sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+    }
+    apiMatches = parsed.response || [];
+  } catch (err) {
+    return { error: "Error consultando la API: " + err, sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+  }
+
+  // Estados de api-football.com: NS (no iniciado), 1H/HT/2H/ET/BT/P (en juego),
+  // FT/AET/PEN (terminado). https://www.api-football.com/documentation-v3
+  const ESTADOS_TERMINADO = ["FT", "AET", "PEN"];
+  const ESTADOS_EN_JUEGO = ["1H", "HT", "2H", "ET", "BT", "P"];
+
+  function indexarPorNombres(lista) {
+    const idx = {};
+    lista.forEach(function (m) {
+      const h = normalizar(traducirEquipo(m.teams.home.name));
+      const a = normalizar(traducirEquipo(m.teams.away.name));
+      idx[h + "|" + a] = m;
+    });
+    return idx;
+  }
+  function buscarPartido(indice, m) {
+    const h = normalizar(m.home), a = normalizar(m.away);
+    let p = indice[h + "|" + a];
+    if (p) return { p: p, swap: false };
+    p = indice[a + "|" + h];
+    if (p) return { p: p, swap: true };
+    return null;
+  }
+  function esPlaceholder(m) {
+    return m.home.indexOf("Por definir") === 0 || m.home.indexOf("Ganador") === 0 || m.home.indexOf("Perdedor") === 0 ||
+           m.away.indexOf("Por definir") === 0 || m.away.indexOf("Ganador") === 0 || m.away.indexOf("Perdedor") === 0;
+  }
+
+  const finished = apiMatches.filter(function (m) { return ESTADOS_TERMINADO.indexOf(m.fixture.status.short) !== -1; });
+  const enJuego = apiMatches.filter(function (m) { return ESTADOS_EN_JUEGO.indexOf(m.fixture.status.short) !== -1; });
+  const idxFinished = indexarPorNombres(finished);
+  const idxEnJuego = indexarPorNombres(enJuego);
+
+  const syncedResults = {};
+  const syncedLive = {};
+  const sinMapear = [];
+  const ahoraISO = new Date().toISOString();
+
+  FIXTURE_ACTUAL.forEach(function (m) {
+    if (esPlaceholder(m)) return;
+
+    const finMatch = buscarPartido(idxFinished, m);
+    if (finMatch) {
+      const p = finMatch.p, swap = finMatch.swap;
+      // goals.home/away ya excluye penales de definición (esos van aparte en score.penalty).
+      const h = p.goals.home == null ? 0 : p.goals.home, a = p.goals.away == null ? 0 : p.goals.away;
+      syncedResults[m.id] = swap ? { h: String(a), a: String(h) } : { h: String(h), a: String(a) };
+      return;
+    }
+
+    const liveMatch = buscarPartido(idxEnJuego, m);
+    if (liveMatch) {
+      const p = liveMatch.p, swap = liveMatch.swap;
+      const h = p.goals.home == null ? 0 : p.goals.home, a = p.goals.away == null ? 0 : p.goals.away;
+      syncedLive[m.id] = {
+        h: String(swap ? a : h), a: String(swap ? h : a),
+        minute: p.fixture.status.elapsed != null ? p.fixture.status.elapsed : null,
+        status: p.fixture.status.short,
+        syncedAt: ahoraISO,
+      };
+      return;
+    }
+
+    sinMapear.push(m.home + " vs " + m.away + " (id " + m.id + ")");
+  });
+
+  const tenantSheets = getAllTenantSheets();
+  tenantSheets.forEach(function (sheet) {
+    const currentResultsRaw = getValueFromSheet(sheet, "results");
+    let currentResults = {};
+    try { currentResults = currentResultsRaw ? JSON.parse(currentResultsRaw) : {}; } catch (e) {}
+    Object.keys(syncedResults).forEach(function (id) { currentResults[id] = syncedResults[id]; });
+    setKey(sheet, "results", JSON.stringify(currentResults));
+    setKey(sheet, "live", JSON.stringify(syncedLive));
+  });
+
+  return {
+    sincronizados: Object.keys(syncedResults).length,
+    enVivo: Object.keys(syncedLive).length,
+    total: FIXTURE_ACTUAL.length,
+    sinMapear: sinMapear,
+    clientes: tenantSheets.map(function (s) { return s.getName(); }),
+  };
+}
+
+function cronSincronizarResultados() {
+  const r = _sincronizar();
+  if (r.error) { Logger.log(r.error); return r.error; }
+  const lines = [];
+  lines.push("Partidos sincronizados: " + r.sincronizados + "/" + r.total);
+  lines.push("En vivo ahora: " + (r.enVivo || 0));
+  if (r.sinMapear.length) lines.push("Pendientes o sin mapear: " + r.sinMapear.join(" | "));
+  lines.push("Actualizado en " + r.clientes.length + " cliente(s): " + r.clientes.join(", "));
+  const out = lines.join("\n");
+  Logger.log(out);
+  return out;
+}
+
+function runManualSyncTest() {
+  Logger.log(cronSincronizarResultados());
+}
+
+/**
+ * Ayuda de una sola vez: llama esto (▶ run buscarLeagueIdColombia) para que el
+ * log te diga el ID exacto de la Liga BetPlay en api-football.com — pégalo en
+ * LEAGUE_ID arriba y ya queda resuelto para siempre.
+ */
+function buscarLeagueIdColombia() {
+  if (!APIFOOTBALL_KEY) { Logger.log("Falta configurar APIFOOTBALL_KEY primero."); return; }
+  const url = APIFOOTBALL_BASE + "/leagues?search=Colombia";
+  const resp = UrlFetchApp.fetch(url, { headers: { "x-apisports-key": APIFOOTBALL_KEY }, muteHttpExceptions: true });
+  const parsed = JSON.parse(resp.getContentText());
+  const lineas = (parsed.response || []).map(function (r) {
+    return "id=" + r.league.id + " · " + r.league.name + " (" + r.country.name + ")";
+  });
+  Logger.log(lineas.join("\n") || "Sin resultados.");
+}
+
+function sanitizeTab(tab) {
+  if (typeof tab !== "string") return null;
+  return TAB_NAME_RE.test(tab) ? tab : null;
+}
+
+function getOrCreateTab(tabName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(tabName);
+  if (!sheet) {
+    sheet = ss.insertSheet(tabName);
+    sheet.appendRow(HEADER);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getAllTenantSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheets().filter(function (sheet) {
+    if (!TAB_NAME_RE.test(sheet.getName())) return false;
+    return !!getValueFromSheet(sheet, "groupName");
+  });
+}
+
+function getValueFromSheet(sheet, key) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][0] === key) return data[i][1];
+  }
+  return null;
+}
+
+function setKey(sheet, key, value) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    sheet.appendRow([key, value]);
+    return;
+  }
+  const keys = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i][0] === key) {
+      sheet.getRange(i + 2, 2).setValue(value);
+      return;
+    }
+  }
+  sheet.appendRow([key, value]);
+}
+
+function getAllKV(sheet) {
+  const lastRow = sheet.getLastRow();
+  const out = {};
+  if (lastRow < 2) return out;
+  const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (let i = 0; i < data.length; i++) {
+    const k = data[i][0];
+    if (k === "" || k == null) continue;
+    out[k] = data[i][1];
+  }
+  return out;
+}
+
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function correrCargaFixtureUnaVez() {
+  cargarFixtureDesdeAPI("fpc_2026_2", 239, 2026);
+}
+
+function cargarLaLiga() {
+  cargarFixtureDesdeAPI("la_liga_2026_27", 140, 2026);
+}
+function cargarChampions() {
+  cargarFixtureDesdeAPI("champions_2026_27", 2, 2026);
+}
