@@ -239,17 +239,26 @@ const TOURNAMENTS={
    llave "torneoId" guardada en la nube. Estas variables se llenan una vez que
    se conoce el torneo, con activarTorneo(). --- */
 let FIXTURE=[],FLAG={},ESCUDOS={},ALLOWED_TEAMS=[];
+function normalizarEquipo(s){return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();}
+let EQUIPO_CANONICO={}; // nombre normalizado -> nombre canónico (el que usan FLAG/ESCUDOS/el filtro de seguimiento)
+function nombreCanonico(n){return EQUIPO_CANONICO[normalizarEquipo(n)]||n;}
+
 async function activarTorneo(id){
   const t=TOURNAMENTS[id]||TOURNAMENTS[TOURNAMENT_DEFAULT];
   FLAG=t.FLAG;
   ESCUDOS=t.ESCUDOS;
   ALLOWED_TEAMS=Object.keys(FLAG).concat(t.EXTRA_ALLOWED||[]).sort();
+  EQUIPO_CANONICO={};
+  Object.keys(FLAG).forEach(nombre=>{EQUIPO_CANONICO[normalizarEquipo(nombre)]=nombre;});
   let partidos=[];
   try{
     const r=await cloudCall({action:"getFixture",torneoId:id});
     if(r&&r.status==="success")partidos=r.partidos||[];
   }catch(e){console.error("No se pudo cargar la malla del torneo:",e);}
-  FIXTURE=partidos.map(r=>({id:r[0],g:r[1],home:r[3],away:r[4],kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio",custom:false}));
+  // nombreCanonico() absorbe diferencias de tilde/mayúscula entre lo que devuelve
+  // la API y nuestros nombres — así el filtro de "seguir equipo" y los escudos
+  // funcionan aunque la API escriba el nombre distinto a como lo adivinamos.
+  FIXTURE=partidos.map(r=>({id:r[0],g:r[1],home:nombreCanonico(r[3]),away:nombreCanonico(r[4]),kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio",custom:false}));
 }
 function flag(n){
   const archivo=ESCUDOS[n];
@@ -379,6 +388,26 @@ const root=document.getElementById("root");
 const elToast=document.getElementById("toast");
 let toastTimer;
 function toast(msg,warn,dur){elToast.textContent=msg;elToast.className="toast show"+(warn?" warn":"");clearTimeout(toastTimer);toastTimer=setTimeout(()=>elToast.className="toast",dur||1900);}
+
+/* Ayudante genérico para cualquier botón que dispare una acción async (guardar,
+   crear, confirmar...): lo deshabilita y le pone el balón girando + texto
+   mientras trabaja, y lo devuelve a su estado original al terminar — tanto si
+   sale bien como si sale mal. Nunca dice "listo" antes de tiempo: solo indica
+   que algo está en curso, igual que la animación de guardar pronósticos. */
+async function conCargando(btn,fn,texto){
+  if(!btn)return await fn();
+  const original=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML=`<span class="ball-spin">⚽</span> ${texto||"Un momento..."}`;
+  try{
+    return await fn();
+  }finally{
+    if(document.body.contains(btn)){ // el modal pudo haberse cerrado ya (caso de éxito)
+      btn.innerHTML=original;
+      btn.disabled=false;
+    }
+  }
+}
 
 /* --- Shell --- */
 function renderShell(){
@@ -795,17 +824,21 @@ async function showGroupEdit(){
     if(p1||p2){
       if(p1.length!==4||!/^\d{4}$/.test(p1)){err.textContent="El PIN debe tener 4 dígitos numéricos.";return;}
       if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
-      const nuevoHash=_hashPin(p1);
-      const okPin=await setJSONAuth("adminPin",nuevoHash);
-      if(!okPin){err.textContent="No se pudo actualizar el PIN.";return;}
-      S.organizerPinHash=nuevoHash;
-      localStorage.setItem("pg_pinhash_"+TAB,nuevoHash);
     }
-    const okName=await setJSONAuth("groupName",name);
-    if(!okName){err.textContent="No se pudo actualizar el nombre del grupo.";return;}
-    S.groupName=name;
-    ov.remove();renderShell();renderView();
-    toast("Grupo actualizado ✓",false,3000);
+    await conCargando(document.getElementById("ge_save"),async()=>{
+      if(p1){
+        const nuevoHash=_hashPin(p1);
+        const okPin=await setJSONAuth("adminPin",nuevoHash);
+        if(!okPin){err.textContent="No se pudo actualizar el PIN.";return;}
+        S.organizerPinHash=nuevoHash;
+        localStorage.setItem("pg_pinhash_"+TAB,nuevoHash);
+      }
+      const okName=await setJSONAuth("groupName",name);
+      if(!okName){err.textContent="No se pudo actualizar el nombre del grupo.";return;}
+      S.groupName=name;
+      ov.remove();renderShell();renderView();
+      toast("Grupo actualizado ✓",false,3000);
+    },"Guardando...");
   };
 }
 
@@ -844,12 +877,14 @@ function showModoSeguimiento(){
     const modo=document.querySelector('input[name="ms_modo"]:checked').value;
     const equipos=[...document.querySelectorAll(".ms_eq:checked")].map(cb=>cb.value);
     if(modo==="equipo"&&!equipos.length){err.textContent="Elige al menos un equipo, o cambia a \"torneo completo\".";return;}
-    const okModo=await setJSONAuth("modoSeguimiento",modo);
-    const okEquipos=await setJSONAuth("equiposSeguidos",equipos);
-    if(!okModo||!okEquipos){err.textContent="No se pudo guardar.";return;}
-    S.modoSeguimiento=modo;S.equiposSeguidos=equipos;
-    ov.remove();renderShell();renderView();
-    toast("Modo de seguimiento actualizado ✓",false,3000);
+    await conCargando(document.getElementById("ms_save"),async()=>{
+      const okModo=await setJSONAuth("modoSeguimiento",modo);
+      const okEquipos=await setJSONAuth("equiposSeguidos",equipos);
+      if(!okModo||!okEquipos){err.textContent="No se pudo guardar.";return;}
+      S.modoSeguimiento=modo;S.equiposSeguidos=equipos;
+      ov.remove();renderShell();renderView();
+      toast("Modo de seguimiento actualizado ✓",false,3000);
+    },"Guardando...");
   };
 }
 
@@ -874,13 +909,15 @@ function editTeamName(id,side,current){
   document.getElementById("popup_cancel_team").onclick=()=>ov.remove();
   document.getElementById("popup_save_team").onclick=async()=>{
     const name=document.getElementById("popup_select_team").value;
-    S.teamOverrides[id]=S.teamOverrides[id]||{};
-    S.teamOverrides[id][side]=name;
-    const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
-    if(!ok)return;
-    ov.remove();
-    toast("Equipo actualizado ✓",false,2500);
-    renderResultados(document.getElementById("content"));
+    await conCargando(document.getElementById("popup_save_team"),async()=>{
+      S.teamOverrides[id]=S.teamOverrides[id]||{};
+      S.teamOverrides[id][side]=name;
+      const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
+      if(!ok)return;
+      ov.remove();
+      toast("Equipo actualizado ✓",false,2500);
+      renderResultados(document.getElementById("content"));
+    },"Guardando...");
   };
 }
 
@@ -911,30 +948,34 @@ function editMatchSchedule(id,currentKick,currentVenue){
   </div>`;
   document.getElementById("ems_cancel").onclick=()=>ov.remove();
   document.getElementById("ems_clear").onclick=async()=>{
-    S.teamOverrides[id]=S.teamOverrides[id]||{};
-    S.teamOverrides[id].kick=null;
-    const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
-    if(!ok)return;
-    ov.remove();
-    toast("Partido movido a \"Por confirmar\" ✓",false,3000);
-    if(S.view==="resultados")renderResultados(document.getElementById("content"));
+    await conCargando(document.getElementById("ems_clear"),async()=>{
+      S.teamOverrides[id]=S.teamOverrides[id]||{};
+      S.teamOverrides[id].kick=null;
+      const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
+      if(!ok)return;
+      ov.remove();
+      toast("Partido movido a \"Por confirmar\" ✓",false,3000);
+      if(S.view==="resultados")renderResultados(document.getElementById("content"));
+    },"Un momento...");
   };
   document.getElementById("ems_save").onclick=async()=>{
     const val=document.getElementById("ems_kick").value;
     const venue=document.getElementById("ems_venue").value.trim();
     const err=document.getElementById("ems_err");
-    S.teamOverrides[id]=S.teamOverrides[id]||{};
     if(val){
-      const epoch=new Date(val+":00-05:00").getTime();
-      if(isNaN(epoch)){err.textContent="Fecha inválida.";return;}
-      S.teamOverrides[id].kick=epoch;
+      const testEpoch=new Date(val+":00-05:00").getTime();
+      if(isNaN(testEpoch)){err.textContent="Fecha inválida.";return;}
     }
-    if(venue)S.teamOverrides[id].venue=venue;
-    const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
-    if(!ok)return;
-    ov.remove();
-    toast("Partido actualizado ✓",false,3000);
-    if(S.view==="resultados")renderResultados(document.getElementById("content"));
+    await conCargando(document.getElementById("ems_save"),async()=>{
+      S.teamOverrides[id]=S.teamOverrides[id]||{};
+      if(val)S.teamOverrides[id].kick=new Date(val+":00-05:00").getTime();
+      if(venue)S.teamOverrides[id].venue=venue;
+      const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
+      if(!ok)return;
+      ov.remove();
+      toast("Partido actualizado ✓",false,3000);
+      if(S.view==="resultados")renderResultados(document.getElementById("content"));
+    },"Guardando...");
   };
 }
 
@@ -982,12 +1023,14 @@ function showBettingConfig(){
     const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
     const err=document.getElementById("bc_err");
     if(insc<0||p1<0||p2<0||p3<0){err.textContent="Valores no válidos.";return;}
-    S.betting={inscripcion:insc,premios:{p1,p2,p3}};
-    const ok=await setJSONAuth("betting",S.betting);
-    if(!ok)return;
-    ov.remove();
-    toast("Premios actualizados ✓",false,3000);
-    if(S.view==="ranking")renderRanking(document.getElementById("content"));
+    await conCargando(document.getElementById("bc_save"),async()=>{
+      S.betting={inscripcion:insc,premios:{p1,p2,p3}};
+      const ok=await setJSONAuth("betting",S.betting);
+      if(!ok)return;
+      ov.remove();
+      toast("Premios actualizados ✓",false,3000);
+      if(S.view==="ranking")renderRanking(document.getElementById("content"));
+    },"Guardando...");
   };
 }
 
@@ -1040,13 +1083,15 @@ function renderResultados(c){
   updateSaveBar();
 }
 async function saveResultsBatch(){
-  S.results=Object.assign({},S.resWork);
-  Object.keys(S.results).forEach(k=>{const r=S.results[k];if(!r||r.h==null||r.a==null)delete S.results[k];});
-  toast("Actualizando marcadores...");
-  const ok=await setJSONAuth("results",S.results);
-  S.resDirty.clear();updateSaveBar();
-  toast(ok?"Resultados guardados ✓":"Error al guardar",!ok);
-  if(S.view==="ranking")renderRanking(document.getElementById("content"));
+  const btn=document.getElementById("saveResBtn");
+  await conCargando(btn,async()=>{
+    S.results=Object.assign({},S.resWork);
+    Object.keys(S.results).forEach(k=>{const r=S.results[k];if(!r||r.h==null||r.a==null)delete S.results[k];});
+    const ok=await setJSONAuth("results",S.results);
+    S.resDirty.clear();updateSaveBar();
+    toast(ok?"Resultados guardados ✓":"Error al guardar",!ok);
+    if(S.view==="ranking")renderRanking(document.getElementById("content"));
+  },"Guardando...");
 }
 
 /* --- Setup inicial --- */
@@ -1117,10 +1162,12 @@ async function showOnboarding(isChange){
     async function tryLogin(){
       const pin=pi.value.trim();
       if(pin.length<4){document.getElementById("pin_err").textContent="El PIN debe tener 4 dígitos.";return;}
-      const storedHash=await getJSON("pin_"+player.id,true);
-      if(!storedHash){await _loginPlayer(player,pin,true);return;}
-      if(_hashPin(pin)!==storedHash){document.getElementById("pin_err").textContent="PIN incorrecto.";pi.value="";pi.focus();return;}
-      await _loginPlayer(player,pin,false);
+      await conCargando(document.getElementById("enterBtn"),async()=>{
+        const storedHash=await getJSON("pin_"+player.id,true);
+        if(!storedHash){await _loginPlayer(player,pin,true);return;}
+        if(_hashPin(pin)!==storedHash){document.getElementById("pin_err").textContent="PIN incorrecto.";pi.value="";pi.focus();return;}
+        await _loginPlayer(player,pin,false);
+      },"Entrando...");
     }
     document.getElementById("enterBtn").onclick=tryLogin;
     pi.onkeydown=e=>{if(e.key==="Enter")tryLogin();};
@@ -1168,20 +1215,20 @@ async function showOnboarding(isChange){
       if(pin1.length<4){err.textContent="PIN de 4 dígitos.";return;}
       if(pin1!==pin2){err.textContent="Los PINes no coinciden.";return;}
       if(roster.find(p=>p.name.toLowerCase()===name.toLowerCase())){err.textContent="Ese nombre ya existe.";return;}
-      btn.disabled=true;
-      const newId="p_"+Math.random().toString(36).slice(2,9);
-      S.me={id:newId,name,ico:pendingIco};
-      await setJSON("me",S.me,false);
-      await setJSON("pin_"+newId,_hashPin(pin1),true);
-      const r=await joinRoster();
-      if(r&&r.status==="name_taken"){
-        btn.disabled=false;
-        err.textContent="Nombre ocupado justo ahora.";
-        S.me=null;await setJSON("me",null,false);
-        return;
-      }
-      ov.remove();renderShell();renderView();
-      toast(`¡Bienvenido ${name}!`,false,5000);
+      await conCargando(btn,async()=>{
+        const newId="p_"+Math.random().toString(36).slice(2,9);
+        S.me={id:newId,name,ico:pendingIco};
+        await setJSON("me",S.me,false);
+        await setJSON("pin_"+newId,_hashPin(pin1),true);
+        const r=await joinRoster();
+        if(r&&r.status==="name_taken"){
+          err.textContent="Nombre ocupado justo ahora.";
+          S.me=null;await setJSON("me",null,false);
+          return;
+        }
+        ov.remove();renderShell();renderView();
+        toast(`¡Bienvenido ${name}!`,false,5000);
+      },"Registrando...");
     };
   }
 
@@ -1249,8 +1296,10 @@ async function showPinReset(){
   ov.querySelectorAll(".pr-row").forEach(btn=>{
     btn.onclick=async()=>{
       const pl=roster.find(p=>p.id===btn.dataset.id);if(!pl)return;
-      await setJSON("pin_"+pl.id,null,true);
-      ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
+      await conCargando(btn,async()=>{
+        await setJSON("pin_"+pl.id,null,true);
+        ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
+      },"Reseteando...");
     };
   });
 }
@@ -1338,15 +1387,17 @@ function bootPanelCentral(){
   setTimeout(()=>pi.focus(),80);
   async function intentar(){
     const err=document.getElementById("pc_err");
-    const hash=_hashPin(pi.value.trim());
-    const r=await cloudCall({action:"adminListarGrupos",masterPin:hash});
-    if(r&&r.status==="success"){
-      PC_masterHash=hash;
-      PC_grupos=r.grupos||[];
-      renderPanelCentralMain();
-    }else{
-      err.textContent=(r&&r.message)||"No se pudo conectar.";
-    }
+    await conCargando(document.getElementById("pc_entrar"),async()=>{
+      const hash=_hashPin(pi.value.trim());
+      const r=await cloudCall({action:"adminListarGrupos",masterPin:hash});
+      if(r&&r.status==="success"){
+        PC_masterHash=hash;
+        PC_grupos=r.grupos||[];
+        renderPanelCentralMain();
+      }else{
+        err.textContent=(r&&r.message)||"No se pudo conectar.";
+      }
+    },"Entrando...");
   }
   document.getElementById("pc_entrar").onclick=intentar;
   pi.onkeydown=e=>{if(e.key==="Enter")intentar();};
@@ -1397,17 +1448,21 @@ function renderPanelCentralMain(){
   document.querySelectorAll(".pc-reset").forEach(btn=>{
     btn.onclick=async()=>{
       if(!confirm(`¿Resetear el PIN de "${btn.dataset.nombre}"? El PIN anterior deja de funcionar de inmediato.`))return;
-      const r=await cloudCall({action:"adminResetearPin",masterPin:PC_masterHash,grupoId:btn.dataset.id});
-      if(r&&r.status==="success"){
-        mostrarGrupoCreado(r.grupoId,r.pin,btn.dataset.nombre);
-      }else{
-        toast((r&&r.message)||"No se pudo resetear.",true,4000);
-      }
+      await conCargando(btn,async()=>{
+        const r=await cloudCall({action:"adminResetearPin",masterPin:PC_masterHash,grupoId:btn.dataset.id});
+        if(r&&r.status==="success"){
+          mostrarGrupoCreado(r.grupoId,r.pin,btn.dataset.nombre);
+        }else{
+          toast((r&&r.message)||"No se pudo resetear.",true,4000);
+        }
+      },"Reseteando...");
     };
   });
   document.querySelectorAll(".pc-estado").forEach(sel=>{
     sel.onchange=async()=>{
+      sel.disabled=true; // un <select> no puede mostrar el balón girando sin romper sus opciones — solo se deshabilita mientras trabaja
       const r=await cloudCall({action:"adminActualizarPago",masterPin:PC_masterHash,grupoId:sel.dataset.id,estadoPago:sel.value});
+      sel.disabled=false;
       if(r&&r.status==="success")toast("Estado de pago actualizado ✓",false,2500);
       else toast("No se pudo actualizar.",true,3000);
     };
@@ -1477,15 +1532,15 @@ function showCrearGrupo(){
     if(!nombreGrupo){err.textContent="Falta el nombre del grupo.";return;}
     if(modoSeguimiento==="equipo"&&!equiposSeguidos.length){err.textContent="Elige al menos un equipo, o marca \"el torneo completo\".";return;}
     if(pin&&!/^\d{4}$/.test(pin)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
-    document.getElementById("cg_crear").disabled=true;
-    const r=await cloudCall({action:"adminProvisionarGrupo",masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pin});
-    if(r&&r.status==="success"){
-      ov.remove();
-      mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo);
-    }else{
-      document.getElementById("cg_crear").disabled=false;
-      err.textContent=(r&&r.message)||"No se pudo crear el grupo.";
-    }
+    await conCargando(document.getElementById("cg_crear"),async()=>{
+      const r=await cloudCall({action:"adminProvisionarGrupo",masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pin});
+      if(r&&r.status==="success"){
+        ov.remove();
+        mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo);
+      }else{
+        err.textContent=(r&&r.message)||"No se pudo crear el grupo.";
+      }
+    },"Creando...");
   };
 }
 
