@@ -526,6 +526,35 @@ function limpiarBettingLegacy() {
 }
 
 /**
+ * LIMPIEZA ÚNICA: borra pestañas "placeholder" vacías que getOrCreateTab crea
+ * automáticamente cuando alguien visita ?grupo=X con un identificador que
+ * nunca fue provisionado (ej. una variante de mayúsculas/minúsculas de un
+ * grupo real, como "prueba_01" vs. el "Prueba_01" real — los nombres de
+ * pestaña en Sheets distinguen mayúsculas). Solo borra pestañas que tengan
+ * como máximo la fila de encabezado (sin datos) y sin "groupName" — nunca
+ * toca una pestaña con cualquier dato real, por accidental que parezca.
+ */
+function limpiarPestanasVacias() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const reporte = [];
+
+  ss.getSheets().forEach(function (sheet) {
+    const nombre = sheet.getName();
+    if (!TAB_NAME_RE.test(nombre)) return;
+    if (nombre === MASTER_SHEET_NAME || nombre.indexOf("_fixture_") === 0) return;
+    if (sheet.getLastRow() > 1) return; // tiene datos más allá del encabezado: no tocar
+    if (getValueFromSheet(sheet, "groupName")) return; // grupo real, aunque esté casi vacío: no tocar
+
+    ss.deleteSheet(sheet);
+    reporte.push(nombre + ": pestaña vacía eliminada");
+  });
+
+  const out = reporte.length ? reporte.join("\n") : "No se encontraron pestañas vacías para eliminar.";
+  Logger.log(out);
+  return out;
+}
+
+/**
  * Sincroniza resultados y marcadores en vivo desde api-football.com.
  * Trae TODA la temporada de la liga en una sola llamada (barato en cuota:
  * 1 request, sin importar cuántos partidos devuelva) y filtra localmente.
