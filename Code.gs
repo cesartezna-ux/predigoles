@@ -233,8 +233,18 @@ function doPost(e) {
 
     if (action === "set") {
       const key = String(body.key);
+      // pin_<id> solo se toca por loginJugador (autoregistro) o
+      // resetearPinJugador (requiere PIN de admin) — nunca por esta vía
+      // genérica, o cualquiera podría fijar el PIN de otro jugador.
+      if (key.indexOf("pin_") === 0) {
+        return jsonOut({ status: "error", message: "Esta clave no se puede modificar por esta vía." });
+      }
       if (isProtectedKey(key)) {
         const authError = checkAdminAuth(sheet, body.pin);
+        if (authError) return jsonOut(authError);
+      } else if (key.indexOf("preds_") === 0) {
+        const playerId = key.slice("preds_".length);
+        const authError = checkPlayerAuth(sheet, playerId, body.pin);
         if (authError) return jsonOut(authError);
       }
       setKey(sheet, key, body.value == null ? "" : String(body.value));
@@ -243,6 +253,44 @@ function doPost(e) {
 
     if (action === "getAll") {
       return jsonOut(sanitizeGetAllOutput(getAllKV(sheet)));
+    }
+
+    // --- Login de organizador: antes se verificaba en el navegador leyendo
+    // el hash de adminPin vía getAll: cualquiera con el link podía leerlo y
+    // atacarlo sin conexión. Ahora getAll nunca lo expone (ver
+    // sanitizeGetAllOutput) y el PIN se verifica aquí, en el servidor. ---
+    if (action === "loginOrganizador") {
+      const authError = checkAdminAuth(sheet, body.pin);
+      if (authError) return jsonOut(authError);
+      return jsonOut({ status: "success" });
+    }
+
+    // --- Login de jugador: mismo cambio que loginOrganizador, pero también
+    // cubre el autoregistro (primera vez que alguien usa ese playerId: se
+    // guarda el PIN que envía y queda como dueño de esa identidad). ---
+    if (action === "loginJugador") {
+      const playerId = String(body.playerId || "");
+      if (!playerId) return jsonOut({ status: "error", message: "playerId requerido." });
+      const pinEnviado = String(body.pin || "");
+      if (!pinEnviado) return jsonOut({ status: "error", message: "PIN requerido." });
+      const storedHash = getValueFromSheet(sheet, "pin_" + playerId);
+      if (!storedHash) {
+        setKey(sheet, "pin_" + playerId, pinEnviado);
+        return jsonOut({ status: "success", nuevo: true });
+      }
+      if (pinEnviado !== storedHash) return jsonOut({ status: "error", message: "PIN incorrecto." });
+      return jsonOut({ status: "success", nuevo: false });
+    }
+
+    // --- Resetear el PIN de un jugador: función del organizador, así que
+    // exige su PIN — antes cualquiera podía llamar esto sin autenticarse. ---
+    if (action === "resetearPinJugador") {
+      const authError = checkAdminAuth(sheet, body.pin);
+      if (authError) return jsonOut(authError);
+      const playerId = String(body.playerId || "");
+      if (!playerId) return jsonOut({ status: "error", message: "playerId requerido." });
+      setKey(sheet, "pin_" + playerId, "");
+      return jsonOut({ status: "success" });
     }
 
     if (action === "joinRoster") {
@@ -412,12 +460,31 @@ function checkAdminAuth(sheet, pinEnviado) {
   return null;
 }
 
+// Igual que checkAdminAuth pero por jugador — protege preds_<id> para que
+// nadie más pueda sobrescribir el pronóstico de otra persona sin su PIN.
+function checkPlayerAuth(sheet, playerId, pinEnviado) {
+  const storedHash = getValueFromSheet(sheet, "pin_" + playerId);
+  if (!storedHash || !pinEnviado || pinEnviado !== storedHash) {
+    return { status: "error", message: "PIN de jugador inválido o el jugador no ha iniciado sesión en este dispositivo." };
+  }
+  return null;
+}
+
 /* "Pagos" fue retirado como funcionalidad (el producto es peer-to-peer: cada
    jugador le transfiere directo al ganador, no hay nada que el admin recaude).
    Este filtro se deja como limpieza defensiva por si algún grupo viejo todavía
-   tiene datos de "pagos" guardados de antes — nunca deben salir en getAll. */
+   tiene datos de "pagos" guardados de antes — nunca deben salir en getAll.
+   adminPin y pin_<id> tampoco deben salir nunca: antes el navegador los leía
+   de aquí para comparar el PIN localmente, lo que permitía a cualquiera con
+   el link intentar romperlos sin conexión — ahora esa verificación vive en
+   el servidor (ver loginOrganizador/loginJugador) y el hash nunca viaja. */
 function sanitizeGetAllOutput(data) {
-  if (data && ("pagos" in data)) delete data.pagos;
+  if (!data) return data;
+  if ("pagos" in data) delete data.pagos;
+  delete data.adminPin;
+  Object.keys(data).forEach(function (k) {
+    if (k.indexOf("pin_") === 0) delete data[k];
+  });
   return data;
 }
 

@@ -293,6 +293,16 @@ async function setJSONAuth(k,o){
   if(r&&r.message)toast("❌ "+r.message,true,4000);
   return false;
 }
+/* Igual que setJSONAuth pero con el PIN del propio jugador — usada para
+   preds_<id>, que el servidor ahora exige (antes cualquiera podía
+   sobrescribir el pronóstico de otro sin su PIN, porque no se pedía). */
+async function setJSONPlayerAuth(k,o){
+  CACHE[k]=JSON.stringify(o);
+  const r=await cloudCall({action:"set",key:k,value:JSON.stringify(o),pin:S.mePinHash});
+  if(r&&r.status==="success")return true;
+  if(r&&r.message)toast("❌ "+r.message,true,4000);
+  return false;
+}
 async function fetchAllShared(){
   const r=await cloudCall({action:"getAll"});
   if(r){for(const k in r)CACHE[k]=r[k];return true;}
@@ -300,7 +310,7 @@ async function fetchAllShared(){
 }
 
 /* --- State --- */
-const S={me:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,torneoId:null,modoSeguimiento:"torneo",equiposSeguidos:[],teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
+const S={me:null,mePinHash:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,torneoId:null,modoSeguimiento:"torneo",equiposSeguidos:[],teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
 const AVATARS=["⚽","🏆","🦁","🐯","🔥","⭐","🚀","🐉","🌶️","🎯","👑","🐺"];
 let pendingIco=AVATARS[0];
 
@@ -451,9 +461,9 @@ function renderShell(){
     } else {
       const ingresado=prompt("🔑 PIN de administrador:");
       if(ingresado===null) return;
-      const storedHash=await getJSON("adminPin",true);
       const intentoHash=_hashPin(ingresado.trim());
-      if(storedHash&&intentoHash===storedHash){
+      const r=await cloudCall({action:"loginOrganizador",pin:intentoHash});
+      if(r&&r.status==="success"){
         S.organizer=true;
         S.organizerPinHash=intentoHash;
         localStorage.setItem("pg_pinhash_"+TAB,intentoHash);
@@ -461,7 +471,7 @@ function renderShell(){
         renderShell();renderView();
         toast("Modo organizador activado ✓",false,3000);
       } else {
-        toast("PIN incorrecto.",true,3000);
+        toast((r&&r.message)||"PIN incorrecto.",true,3000);
       }
     }
   };
@@ -706,7 +716,7 @@ async function savePreds(){
     if(lbl)lbl.textContent=mensajes[mi];
   },2200);
 
-  const ok=await setJSON("preds_"+S.me.id,S.predsMe,true);
+  const ok=await setJSONPlayerAuth("preds_"+S.me.id,S.predsMe);
   if(ok){
     // Solo llamamos a joinRoster si de verdad hace falta (registro nuevo o
     // cambió nombre/avatar) — chequeo local, sin viaje de red, así que no
@@ -1178,10 +1188,12 @@ async function showOnboarding(isChange){
       const pin=pi.value.trim();
       if(pin.length<4){document.getElementById("pin_err").textContent="El PIN debe tener 4 dígitos.";return;}
       await conCargando(document.getElementById("enterBtn"),async()=>{
-        const storedHash=await getJSON("pin_"+player.id,true);
-        if(!storedHash){await _loginPlayer(player,pin,true);return;}
-        if(_hashPin(pin)!==storedHash){document.getElementById("pin_err").textContent="PIN incorrecto.";pi.value="";pi.focus();return;}
-        await _loginPlayer(player,pin,false);
+        const r=await cloudCall({action:"loginJugador",playerId:player.id,pin:_hashPin(pin)});
+        if(!r||r.status!=="success"){
+          document.getElementById("pin_err").textContent=(r&&r.message)||"PIN incorrecto.";
+          pi.value="";pi.focus();return;
+        }
+        await _loginPlayer(player,pin,!!r.nuevo);
       },"Entrando...");
     }
     document.getElementById("enterBtn").onclick=tryLogin;
@@ -1232,9 +1244,16 @@ async function showOnboarding(isChange){
       if(roster.find(p=>p.name.toLowerCase()===name.toLowerCase())){err.textContent="Ese nombre ya existe.";return;}
       await conCargando(btn,async()=>{
         const newId="p_"+Math.random().toString(36).slice(2,9);
+        const pinHash=_hashPin(pin1);
+        const rLogin=await cloudCall({action:"loginJugador",playerId:newId,pin:pinHash});
+        if(!rLogin||rLogin.status!=="success"){
+          err.textContent=(rLogin&&rLogin.message)||"No se pudo registrar el PIN. Intenta de nuevo.";
+          return;
+        }
         S.me={id:newId,name,ico:pendingIco};
         await setJSON("me",S.me,false);
-        await setJSON("pin_"+newId,_hashPin(pin1),true);
+        S.mePinHash=pinHash;
+        localStorage.setItem("pg_pinp_"+TAB+"_"+newId,pinHash);
         const r=await joinRoster();
         if(r&&r.status==="name_taken"){
           err.textContent="Nombre ocupado justo ahora.";
@@ -1250,9 +1269,8 @@ async function showOnboarding(isChange){
   async function _loginPlayer(player,pin,isFirstTime){
     S.me={id:player.id,name:player.name,ico:player.ico};
     await setJSON("me",S.me,false);
-    if(isFirstTime){
-      await setJSON("pin_"+player.id,_hashPin(pin),true);
-    }
+    S.mePinHash=_hashPin(pin);
+    localStorage.setItem("pg_pinp_"+TAB+"_"+player.id,S.mePinHash);
     await _migrarPronosticos(player.id);
     S.predsMe=(await getJSON("preds_"+player.id,true))||{};
     await joinRoster();
@@ -1287,7 +1305,7 @@ async function _migrarPronosticos(targetId){
     const oldEntry=roster.find(p=>p.id!==targetId&&p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")===myName&&p.id.startsWith("p_"));
     if(oldEntry){
       const oldPreds=await getJSON("preds_"+oldEntry.id,true);
-      if(oldPreds&&Object.keys(oldPreds).length>0)await setJSON("preds_"+targetId,oldPreds,true);
+      if(oldPreds&&Object.keys(oldPreds).length>0)await setJSONPlayerAuth("preds_"+targetId,oldPreds);
     }
   }catch(e){console.error("Error migrando:",e);}
 }
@@ -1312,8 +1330,12 @@ async function showPinReset(){
     btn.onclick=async()=>{
       const pl=roster.find(p=>p.id===btn.dataset.id);if(!pl)return;
       await conCargando(btn,async()=>{
-        await setJSON("pin_"+pl.id,null,true);
-        ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
+        const r=await cloudCall({action:"resetearPinJugador",playerId:pl.id,pin:S.organizerPinHash});
+        if(r&&r.status==="success"){
+          ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
+        } else {
+          toast((r&&r.message)||"No se pudo resetear el PIN.",true,4000);
+        }
       },"Reseteando...");
     };
   });
@@ -1592,6 +1614,7 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
   try{
     S.allPreds={};
     S.me=await getJSON("me",false);
+    S.mePinHash=S.me?localStorage.getItem("pg_pinp_"+TAB+"_"+S.me.id):null;
     S.organizer=(await getJSON("organizer",false))||false;
     S.organizerPinHash=S.organizer?localStorage.getItem("pg_pinhash_"+TAB):null;
     const conectado=await fetchAllShared();
@@ -1622,6 +1645,11 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
     
     renderShell();renderView();
     if(!S.me)showOnboarding(false);
+    // Sesiones que quedaron activas antes de este cambio de seguridad tienen
+    // "me" guardado pero nunca guardaron el hash del PIN localmente (no
+    // existía esa clave) — se les pide reconfirmar su PIN una sola vez; el
+    // servidor ya lo tiene guardado, así que solo valida y lo cachea.
+    else if(!S.mePinHash)showOnboarding(true);
   }catch(e){console.error("Boot error:",e);renderShell();renderView();}
 })();
 </script>
