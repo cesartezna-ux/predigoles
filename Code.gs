@@ -999,5 +999,8 @@ function cargarLaLiga() {
   cargarFixtureDesdeAPI("la_liga_2026_27", 140, 2026);
 }
 function cargarChampions() {
-  cargarFixtureDesdeAPI("champions_2026_27", 2, 2026);
+  // Sin filtro, "season" trae también las rondas clasificatorias previas (equipos
+  // ya eliminados que nunca llegan a la fase de liga) — "League Stage" acota a
+  // los 36 equipos reales del nuevo formato de la Champions.
+  cargarFixtureDesdeAPI("champions_2026_27", 2, 2026, "League Stage");
 }

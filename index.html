@@ -211,10 +211,17 @@ const TOURNAMENTS={
     kicker:"La Liga · España",
     h1a:"Rumbo al ",h1b:"Título",
     subtitulo:"Acierta el resultado y clava el marcador en la liga española.",
-    // Sin escudos ni emoji propios todavía — cae al ⚽ de respaldo automáticamente
-    // en cada equipo. Se pueden agregar después, igual que se hizo con Colombia
-    // (FLAG/ESCUDOS aquí + imágenes en /escudos/ en la raíz del repo).
-    FLAG:{},
+    // Nombres tomados directo del fixture ya cargado (mismo texto que usa
+    // api-football.com), para que "seguir equipo" y el emparejamiento de
+    // partidos usen exactamente la misma grafía — sin escudos propios todavía,
+    // cae al ⚽ de respaldo automáticamente en cada equipo.
+    FLAG:{
+      "Alaves":"⚽","Athletic Club":"⚽","Atletico Madrid":"⚽","Barcelona":"⚽",
+      "Celta Vigo":"⚽","Deportivo La Coruna":"⚽","Elche":"⚽","Espanyol":"⚽",
+      "Getafe":"⚽","Levante":"⚽","Malaga":"⚽","Osasuna":"⚽",
+      "Racing Santander":"⚽","Rayo Vallecano":"⚽","Real Betis":"⚽","Real Madrid":"⚽",
+      "Real Sociedad":"⚽","Sevilla":"⚽","Valencia":"⚽","Villarreal":"⚽"
+    },
     ESCUDOS:{},
     EXTRA_ALLOWED:[]
   },
@@ -223,7 +230,20 @@ const TOURNAMENTS={
     kicker:"Champions League",
     h1a:"Rumbo a la ",h1b:"Final",
     subtitulo:"Acierta el resultado y clava el marcador en la máxima competencia de Europa.",
-    FLAG:{},
+    // Solo los 36 equipos de la fase de liga (ver cargarChampions() en Code.gs,
+    // filtrado por "League Stage") — sin las rondas clasificatorias previas,
+    // que traen equipos que nunca llegan a jugar esta fase.
+    FLAG:{
+      "AEK Athens FC":"⚽","AS Roma":"⚽","Arsenal":"⚽","Aston Villa":"⚽",
+      "Atletico Madrid":"⚽","Barcelona":"⚽","Bayern München":"⚽","Bodo/Glimt":"⚽",
+      "Borussia Dortmund":"⚽","Club Brugge KV":"⚽","Como":"⚽","FC Porto":"⚽",
+      "Fenerbahçe":"⚽","Feyenoord":"⚽","Galatasaray":"⚽","Inter":"⚽",
+      "Lask Linz":"⚽","Lens":"⚽","Lille":"⚽","Liverpool":"⚽",
+      "Manchester City":"⚽","Manchester United":"⚽","Napoli":"⚽","PSV Eindhoven":"⚽",
+      "Paris Saint Germain":"⚽","RB Leipzig":"⚽","Real Betis":"⚽","Real Madrid":"⚽",
+      "Sabah FA":"⚽","Shakhtar Donetsk":"⚽","Slavia Praha":"⚽","Slovan Bratislava":"⚽",
+      "Sporting CP":"⚽","VfB Stuttgart":"⚽","Viking":"⚽","Villarreal":"⚽"
+    },
     ESCUDOS:{},
     EXTRA_ALLOWED:[
       "Por definir (Octavos)","Por definir (Cuartos)","Por definir (Semis)",
