@@ -1106,6 +1106,21 @@ function showGrupoNoEncontrado(){
     <p style="color:var(--muted);font-size:13px">Si crees que esto es un error, contacta a quien te compartió el link.</p>
   </div>`;
 }
+/* Distinto del caso anterior: aquí SÍ pudimos hablar con el servidor pero la
+   respuesta no trajo datos utilizables (timeout, red caída, CORS, etc.). No
+   podemos asumir que el grupo no existe — solo que no pudimos confirmarlo. */
+function showErrorConexion(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card" style="border-color:rgba(255,77,109,.4)">
+    <div class="kicker" style="color:var(--flare)">Sin conexión con el servidor</div>
+    <h2>No pudimos cargar este grupo</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Puede que tu conexión esté fallando o el servidor haya tardado en responder. El grupo (<b style="color:var(--line)">${escapeHtml(TAB)}</b>) no necesariamente dejó de existir.</p>
+    <button class="btn" id="ec_reintentar" style="margin-top:6px">🔄 Reintentar</button>
+  </div>`;
+  document.getElementById("ec_reintentar").onclick=()=>location.reload();
+}
 
 /* --- Onboarding --- */
 async function showOnboarding(isChange){
@@ -1579,7 +1594,8 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
     S.me=await getJSON("me",false);
     S.organizer=(await getJSON("organizer",false))||false;
     S.organizerPinHash=S.organizer?localStorage.getItem("pg_pinhash_"+TAB):null;
-    await fetchAllShared();
+    const conectado=await fetchAllShared();
+    if(!conectado){ showErrorConexion(); return; }
     S.torneoId=(await getJSON("torneoId",true))||TOURNAMENT_DEFAULT; // grupos anteriores a este catálogo (ej. JorgeLozano) caen al torneo por defecto
     await activarTorneo(S.torneoId);
     S.modoSeguimiento=(await getJSON("modoSeguimiento",true))||"torneo";
