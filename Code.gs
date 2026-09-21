@@ -331,11 +331,14 @@ function manejarAccionMaestra(action, body) {
       if (!pin) pin = String(Math.floor(1000 + Math.random() * 9000)); // genera uno de 4 dígitos si no se especificó
       if (!/^\d{4}$/.test(pin)) return jsonOut({ status: "error", message: "El PIN debe ser de 4 dígitos." });
 
-      setKey(sheet, "groupName", nombreGrupo);
+      // El frontend lee estas claves con getJSON() (hace JSON.parse), así que
+      // deben guardarse codificadas en JSON — no como texto plano — o el
+      // parse falla en silencio y el grupo aparece como "no encontrado".
+      setKey(sheet, "groupName", JSON.stringify(nombreGrupo));
       setKey(sheet, "adminPin", _hashPinGS(pin));
-      setKey(sheet, "torneoId", torneoId);
+      setKey(sheet, "torneoId", JSON.stringify(torneoId));
       const modoSeguimiento = (body.modoSeguimiento === "equipo") ? "equipo" : "torneo";
-      setKey(sheet, "modoSeguimiento", modoSeguimiento);
+      setKey(sheet, "modoSeguimiento", JSON.stringify(modoSeguimiento));
       setKey(sheet, "equiposSeguidos", JSON.stringify(Array.isArray(body.equiposSeguidos) ? body.equiposSeguidos : []));
 
       const masterSheet = getOrCreateMasterSheet();
@@ -550,6 +553,40 @@ function limpiarPestanasVacias() {
   });
 
   const out = reporte.length ? reporte.join("\n") : "No se encontraron pestañas vacías para eliminar.";
+  Logger.log(out);
+  return out;
+}
+
+/**
+ * REPARACIÓN ÚNICA: adminProvisionarGrupo guardaba groupName/torneoId/
+ * modoSeguimiento como texto plano, pero el frontend siempre los lee con
+ * getJSON() (que hace JSON.parse) — el parse fallaba en silencio y el grupo
+ * aparecía como "no encontrado" aunque los datos estuvieran ahí (así se
+ * detectó: el grupo "Prueba_01" quedó así desde que se creó por el panel
+ * central el 2026-09-12). Ya se corrigió el origen en adminProvisionarGrupo;
+ * esto repara los grupos que ya quedaron mal guardados. Es seguro correrlo
+ * más de una vez: si un valor ya es JSON válido, lo deja tal cual.
+ */
+function repararCodificacionJSON() {
+  const claves = ["groupName", "torneoId", "modoSeguimiento"];
+  const tenantSheets = getAllTenantSheets();
+  const reporte = [];
+
+  tenantSheets.forEach(function (sheet) {
+    claves.forEach(function (clave) {
+      const raw = getValueFromSheet(sheet, clave);
+      if (!raw) return;
+      try {
+        JSON.parse(raw);
+        return; // ya es JSON válido, no tocar
+      } catch (e) {
+        setKey(sheet, clave, JSON.stringify(raw));
+        reporte.push(sheet.getName() + "." + clave + ": recodificado a JSON");
+      }
+    });
+  });
+
+  const out = reporte.length ? reporte.join("\n") : "No se encontraron valores mal codificados.";
   Logger.log(out);
   return out;
 }
