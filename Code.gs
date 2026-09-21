@@ -490,6 +490,42 @@ function mergeDuplicatePlayers() {
 }
 
 /**
+ * LIMPIEZA ÚNICA: quita campos legado de "betting" (adminPct, pagos) que ya
+ * no existen en el modelo actual — el producto es peer-to-peer, no recauda
+ * ni cobra comisión; "betting" hoy solo debe guardar inscripcion/premios
+ * como referencia informativa para el organizador. Corre esto una vez para
+ * no dejar en la hoja ningún rastro de un modelo de recaudo descartado por
+ * decisión de negocio (evitar cualquier apariencia de administrar apuestas
+ * ante entidades como Coljuegos).
+ */
+function limpiarBettingLegacy() {
+  const tenantSheets = getAllTenantSheets();
+  const reporte = [];
+
+  tenantSheets.forEach(function (sheet) {
+    const raw = getValueFromSheet(sheet, "betting");
+    if (!raw) return;
+    let betting;
+    try { betting = JSON.parse(raw); } catch (e) { return; }
+    if (!betting || typeof betting !== "object") return;
+
+    const camposViejos = ["adminPct", "pagos"].filter(function (k) { return k in betting; });
+    if (!camposViejos.length) return;
+
+    const limpio = {
+      inscripcion: betting.inscripcion || 0,
+      premios: betting.premios || { p1: 0, p2: 0, p3: 0 },
+    };
+    setKey(sheet, "betting", JSON.stringify(limpio));
+    reporte.push(sheet.getName() + ": se quitó " + camposViejos.join(" y "));
+  });
+
+  const out = reporte.length ? reporte.join("\n") : "No se encontraron campos legado (adminPct/pagos) en ningún grupo.";
+  Logger.log(out);
+  return out;
+}
+
+/**
  * Sincroniza resultados y marcadores en vivo desde api-football.com.
  * Trae TODA la temporada de la liga en una sola llamada (barato en cuota:
  * 1 request, sin importar cuántos partidos devuelva) y filtra localmente.
