@@ -144,6 +144,17 @@ const TEAM_DICT = {
   "Junior": "Junior F.C.",
   "Deportivo Pasto": "Deportivo Pasto",
   "Boyaca Chico": "Boyacá Chicó F.C.",
+  // A partir del Clausura 2026-2 la API empezó a devolver nombres más cortos
+  // para estos 7 equipos (confirmado contra la malla real ya cargada). Se
+  // agregan sin borrar las variantes de arriba, por si la API vuelve a usar
+  // el nombre largo en otra temporada.
+  "Alianza Valledupar": "Alianza Valledupar F.C.",
+  "Bucaramanga": "Atlético Bucaramanga",
+  "Chico": "Boyacá Chicó F.C.",
+  "Cucuta": "Cúcuta Deportivo",
+  "Fortaleza FC": "Fortaleza",
+  "Jaguares": "Jaguares F.C.",
+  "Santa Fe": "Independiente Santa Fe",
 };
 
 function doPost(e) {
