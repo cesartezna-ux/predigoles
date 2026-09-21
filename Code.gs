@@ -87,7 +87,14 @@ function getOrCreateFixtureTab(torneoId) {
   return sheet;
 }
 
-function cargarFixtureDesdeAPI(torneoId, leagueId, season) {
+// Google Sheets rechaza cualquier valor de celda de más de 50,000 caracteres.
+// Con temporadas que traen cientos de partidos (o cuando "season" de la API
+// agrupa varios torneos, ver roundContains abajo) el JSON de "partidos" puede
+// acercarse a ese límite — mejor frenar con un mensaje claro que dejar que
+// Sheets tire un error genérico a mitad de la escritura.
+const LIMITE_CARACTERES_CELDA = 50000;
+
+function cargarFixtureDesdeAPI(torneoId, leagueId, season, roundContains) {
   if (!APIFOOTBALL_KEY) { Logger.log("Falta configurar APIFOOTBALL_KEY en Propiedades del proyecto."); return; }
   if (!torneoId || !leagueId || !season) { Logger.log("Faltan parámetros: torneoId, leagueId y season son obligatorios."); return; }
 
@@ -98,7 +105,18 @@ function cargarFixtureDesdeAPI(torneoId, leagueId, season) {
   const parsed = JSON.parse(resp.getContentText());
   if (parsed.errors && Object.keys(parsed.errors).length) { Logger.log("Error API: " + JSON.stringify(parsed.errors)); return; }
 
-  const partidos = (parsed.response || []).map(function (m) {
+  // api-football agrupa TODA la temporada bajo un solo "season" — en ligas con
+  // Apertura y Clausura (como la colombiana) eso trae ambos torneos juntos.
+  // roundContains filtra por el nombre de fase (ej. "Clausura") para quedarnos
+  // solo con la malla que de verdad queremos guardar en este torneoId.
+  let response = parsed.response || [];
+  if (roundContains) {
+    response = response.filter(function (m) {
+      return String(m.league.round || "").indexOf(roundContains) !== -1;
+    });
+  }
+
+  const partidos = response.map(function (m) {
     // status.short "TBD" = fecha/hora todavía no confirmada por la liga.
     const kick = m.fixture.status.short === "TBD" ? "" : m.fixture.date;
     const venue = (m.fixture.venue && m.fixture.venue.name)
@@ -114,9 +132,15 @@ function cargarFixtureDesdeAPI(torneoId, leagueId, season) {
     ];
   });
 
+  const json = JSON.stringify(partidos);
+  if (json.length > LIMITE_CARACTERES_CELDA) {
+    Logger.log("No se guardó: el JSON de \"" + torneoId + "\" tiene " + json.length + " caracteres, supera el límite de " + LIMITE_CARACTERES_CELDA + " por celda de Sheets. Usa roundContains para acotar a una sola fase (ver cargarFixtureDesdeAPI).");
+    return;
+  }
+
   const tab = getOrCreateFixtureTab(torneoId);
-  setKey(tab, "partidos", JSON.stringify(partidos));
-  Logger.log("Cargados " + partidos.length + " partidos para \"" + torneoId + "\" (liga " + leagueId + ", temporada " + season + ").");
+  setKey(tab, "partidos", json);
+  Logger.log("Cargados " + partidos.length + " partidos para \"" + torneoId + "\" (liga " + leagueId + ", temporada " + season + (roundContains ? ", fase \"" + roundContains + "\"" : "") + ").");
 }
 
 /* api-football.com a veces usa nombres oficiales ligeramente distintos a los
@@ -759,7 +783,9 @@ function jsonOut(obj) {
 }
 
 function correrCargaFixtureUnaVez() {
-  cargarFixtureDesdeAPI("fpc_2026_2", 239, 2026);
+  // "Clausura": el season=2026 de esta liga trae Apertura y Clausura juntos —
+  // sin este filtro se cae el límite de 50,000 caracteres por celda de Sheets.
+  cargarFixtureDesdeAPI("fpc_2026_2", 239, 2026, "Clausura");
 }
 
 function cargarLaLiga() {
