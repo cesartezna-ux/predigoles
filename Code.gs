@@ -236,7 +236,7 @@ function doPost(e) {
 
     if (action === "syncNow") {
       const resultado = _sincronizar();
-      return jsonOut({ status: "success", sincronizados: resultado.sincronizados, enVivo: resultado.enVivo, total: resultado.total, sinMapear: resultado.sinMapear, error: resultado.error || null });
+      return jsonOut({ status: "success", sincronizados: resultado.sincronizados, enVivo: resultado.enVivo, limpiados: resultado.limpiados, total: resultado.total, sinMapear: resultado.sinMapear, error: resultado.error || null });
     }
 
     return jsonOut({ status: "error", message: "acción desconocida: " + action });
@@ -521,24 +521,86 @@ function _sincronizar() {
     return m.home.indexOf("Por definir") === 0 || m.home.indexOf("Ganador") === 0 || m.home.indexOf("Perdedor") === 0 ||
            m.away.indexOf("Por definir") === 0 || m.away.indexOf("Ganador") === 0 || m.away.indexOf("Perdedor") === 0;
   }
+  // "af_1549780" -> 1549780 (el id real que usa api-football, embebido en el
+  // id interno desde cargarFixtureDesdeAPI). null si el fixture no tiene ese
+  // formato, en cuyo caso cae al respaldo por nombre más abajo.
+  function idAPIFootball(fixtureId) {
+    const m = /^af_(\d+)$/.exec(String(fixtureId));
+    return m ? Number(m[1]) : null;
+  }
 
   const finished = apiMatches.filter(function (m) { return ESTADOS_TERMINADO.indexOf(m.fixture.status.short) !== -1; });
   const enJuego = apiMatches.filter(function (m) { return ESTADOS_EN_JUEGO.indexOf(m.fixture.status.short) !== -1; });
+  // Índice principal: por id real de partido. Es inequívoco — a diferencia del
+  // índice por nombre de equipo, nunca puede confundir el mismo enfrentamiento
+  // repetido en otra fase de la temporada (p.ej. Apertura y Clausura, donde
+  // cada pareja de equipos se juega dos veces). Ese fue justo el bug: el
+  // índice por nombre solo guarda una entrada por pareja, así que el resultado
+  // ya jugado de una fase se le pegaba al partido todavía no jugado de la otra.
+  const idxIdFinished = {};
+  finished.forEach(function (m) { idxIdFinished[m.fixture.id] = m; });
+  const idxIdEnJuego = {};
+  enJuego.forEach(function (m) { idxIdEnJuego[m.fixture.id] = m; });
+  // Todos los partidos que la API sí conoce (jugados, en vivo o no iniciados) —
+  // sirve para distinguir "confirmado que aún no se juega" (limpiar cualquier
+  // marcador viejo) de "no aparece en la respuesta de la API" (no tocar nada,
+  // podría ser un problema pasajero de la API y no queremos borrar por error).
+  const idxIdTodos = {};
+  apiMatches.forEach(function (m) { idxIdTodos[m.fixture.id] = m; });
+  // Respaldo por nombre: solo para fixtures sin id real (no debería pasar con
+  // la malla actual, que siempre viene de cargarFixtureDesdeAPI, pero queda
+  // por si algún día se carga una malla de otra forma).
   const idxFinished = indexarPorNombres(finished);
   const idxEnJuego = indexarPorNombres(enJuego);
 
   const syncedResults = {};
   const syncedLive = {};
   const sinMapear = [];
+  // Fixtures que la API confirma que AÚN NO SE JUEGAN (o se posrgaron): si ya
+  // tenían un marcador guardado de antes —como los que dejó el bug de
+  // emparejar por nombre—, hay que borrarlo, no solo dejar de escribir uno nuevo.
+  const aLimpiar = [];
   const ahoraISO = new Date().toISOString();
 
   FIXTURE_ACTUAL.forEach(function (m) {
     if (esPlaceholder(m)) return;
 
+    const apiId = idAPIFootball(m.id);
+    if (apiId != null) {
+      const pFin = idxIdFinished[apiId];
+      if (pFin) {
+        // goals.home/away ya excluye penales de definición (esos van aparte en score.penalty).
+        const h = pFin.goals.home == null ? 0 : pFin.goals.home, a = pFin.goals.away == null ? 0 : pFin.goals.away;
+        syncedResults[m.id] = { h: String(h), a: String(a) };
+        return;
+      }
+      const pLive = idxIdEnJuego[apiId];
+      if (pLive) {
+        const h = pLive.goals.home == null ? 0 : pLive.goals.home, a = pLive.goals.away == null ? 0 : pLive.goals.away;
+        syncedLive[m.id] = {
+          h: String(h), a: String(a),
+          minute: pLive.fixture.status.elapsed != null ? pLive.fixture.status.elapsed : null,
+          status: pLive.fixture.status.short,
+          syncedAt: ahoraISO,
+        };
+        return;
+      }
+      if (idxIdTodos[apiId]) {
+        // La API sí tiene este partido y su estado no es "terminado" ni "en
+        // juego" (NS, TBD, pospuesto, etc.) — confirmado que no hay marcador
+        // real todavía. Si quedó uno guardado de antes, se limpia abajo.
+        aLimpiar.push(m.id);
+        return;
+      }
+      // apiId válido pero la API no devolvió nada para él — no tocar lo que
+      // haya guardado, podría ser un hueco temporal de la API, no evidencia
+      // de que el partido no se jugó.
+      return;
+    }
+
     const finMatch = buscarPartido(idxFinished, m);
     if (finMatch) {
       const p = finMatch.p, swap = finMatch.swap;
-      // goals.home/away ya excluye penales de definición (esos van aparte en score.penalty).
       const h = p.goals.home == null ? 0 : p.goals.home, a = p.goals.away == null ? 0 : p.goals.away;
       syncedResults[m.id] = swap ? { h: String(a), a: String(h) } : { h: String(h), a: String(a) };
       return;
@@ -561,11 +623,15 @@ function _sincronizar() {
   });
 
   const tenantSheets = getAllTenantSheets();
+  let limpiados = 0;
   tenantSheets.forEach(function (sheet) {
     const currentResultsRaw = getValueFromSheet(sheet, "results");
     let currentResults = {};
     try { currentResults = currentResultsRaw ? JSON.parse(currentResultsRaw) : {}; } catch (e) {}
     Object.keys(syncedResults).forEach(function (id) { currentResults[id] = syncedResults[id]; });
+    aLimpiar.forEach(function (id) {
+      if (Object.prototype.hasOwnProperty.call(currentResults, id)) { delete currentResults[id]; limpiados++; }
+    });
     setKey(sheet, "results", JSON.stringify(currentResults));
     setKey(sheet, "live", JSON.stringify(syncedLive));
   });
@@ -573,6 +639,7 @@ function _sincronizar() {
   return {
     sincronizados: Object.keys(syncedResults).length,
     enVivo: Object.keys(syncedLive).length,
+    limpiados: limpiados,
     total: FIXTURE_ACTUAL.length,
     sinMapear: sinMapear,
     clientes: tenantSheets.map(function (s) { return s.getName(); }),
@@ -585,6 +652,7 @@ function cronSincronizarResultados() {
   const lines = [];
   lines.push("Partidos sincronizados: " + r.sincronizados + "/" + r.total);
   lines.push("En vivo ahora: " + (r.enVivo || 0));
+  if (r.limpiados) lines.push("Marcadores viejos limpiados (partidos que resultaron no jugados): " + r.limpiados);
   if (r.sinMapear.length) lines.push("Pendientes o sin mapear: " + r.sinMapear.join(" | "));
   lines.push("Actualizado en " + r.clientes.length + " cliente(s): " + r.clientes.join(", "));
   const out = lines.join("\n");
