@@ -303,6 +303,18 @@ async function setJSONPlayerAuth(k,o){
   if(r&&r.message)toast("❌ "+r.message,true,4000);
   return false;
 }
+/* Para valores que YA son el hash final y no deben envolverse en JSON.stringify
+   (adminPin, pin_<id>) — el backend los compara como texto plano. Usar
+   setJSONAuth aquí los dejaría entre comillas literales en la hoja, lo que
+   rompe el login de quien tenga ese PIN (ya pasó una vez: ver
+   repararPinesLegacy en Code.gs). */
+async function setRawAuth(k,rawValue){
+  CACHE[k]=rawValue;
+  const r=await cloudCall({action:"set",key:k,value:rawValue,pin:S.organizerPinHash});
+  if(r&&r.status==="success")return true;
+  if(r&&r.message)toast("❌ "+r.message,true,4000);
+  return false;
+}
 async function fetchAllShared(){
   const r=await cloudCall({action:"getAll"});
   if(r){for(const k in r)CACHE[k]=r[k];return true;}
@@ -838,7 +850,7 @@ async function showGroupEdit(){
     await conCargando(document.getElementById("ge_save"),async()=>{
       if(p1){
         const nuevoHash=_hashPin(p1);
-        const okPin=await setJSONAuth("adminPin",nuevoHash);
+        const okPin=await setRawAuth("adminPin",nuevoHash);
         if(!okPin){err.textContent="No se pudo actualizar el PIN.";return;}
         S.organizerPinHash=nuevoHash;
         localStorage.setItem("pg_pinhash_"+TAB,nuevoHash);

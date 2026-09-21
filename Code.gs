@@ -659,6 +659,44 @@ function repararCodificacionJSON() {
 }
 
 /**
+ * REPARACIÓN ÚNICA: antes de este cambio, el navegador guardaba adminPin
+ * (al cambiarlo desde "Editar grupo") y pin_<id> (al registrarse un jugador)
+ * envueltos en JSON.stringify — quedaban en la hoja con comillas literales
+ * (ej. "ph_wy6a" en vez de ph_wy6a). loginOrganizador/loginJugador comparan
+ * como texto plano, así que cualquiera con un PIN guardado así de antes
+ * empezó a ver "PIN incorrecto" aunque su PIN fuera correcto — así se
+ * detectó, con un jugador de "jorgelozano". Esto desenvuelve cualquier
+ * adminPin/pin_<id> que todavía tenga esas comillas. Seguro de correr más
+ * de una vez: si ya está en texto plano, no lo toca.
+ */
+function repararPinesLegacy() {
+  const tenantSheets = getAllTenantSheets();
+  const reporte = [];
+
+  function normalizar(sheet, key, raw) {
+    if (typeof raw !== "string" || raw.length < 2) return;
+    if (raw.charAt(0) !== '"' || raw.charAt(raw.length - 1) !== '"') return; // ya es texto plano
+    try {
+      const limpio = JSON.parse(raw);
+      setKey(sheet, key, limpio);
+      reporte.push(sheet.getName() + "." + key + ": recodificado a texto plano");
+    } catch (e) {}
+  }
+
+  tenantSheets.forEach(function (sheet) {
+    const kv = getAllKV(sheet);
+    normalizar(sheet, "adminPin", kv.adminPin);
+    Object.keys(kv).forEach(function (key) {
+      if (key.indexOf("pin_") === 0) normalizar(sheet, key, kv[key]);
+    });
+  });
+
+  const out = reporte.length ? reporte.join("\n") : "No se encontraron PIN mal codificados.";
+  Logger.log(out);
+  return out;
+}
+
+/**
  * Sincroniza resultados y marcadores en vivo desde api-football.com.
  * Trae TODA la temporada de la liga en una sola llamada (barato en cuota:
  * 1 request, sin importar cuántos partidos devuelva) y filtra localmente.
