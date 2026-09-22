@@ -31,8 +31,14 @@ function _hashPinGS(pin) {
   return "ph_" + Math.abs(h).toString(36);
 }
 function checkMasterAuth(pinEnviado) {
+  const bloqueo = rateLimitCheck("master");
+  if (bloqueo) return bloqueo;
   if (!MASTER_PIN_HASH) return { status: "error", message: "PIN maestro no configurado en el servidor todavía." };
-  if (!pinEnviado || pinEnviado !== MASTER_PIN_HASH) return { status: "error", message: "PIN maestro inválido." };
+  if (!pinEnviado || pinEnviado !== MASTER_PIN_HASH) {
+    rateLimitRegistrarFallo("master");
+    return { status: "error", message: "PIN maestro inválido." };
+  }
+  rateLimitRegistrarExito("master");
   return null;
 }
 function getOrCreateMasterSheet() {
@@ -273,12 +279,23 @@ function doPost(e) {
       if (!playerId) return jsonOut({ status: "error", message: "playerId requerido." });
       const pinEnviado = String(body.pin || "");
       if (!pinEnviado) return jsonOut({ status: "error", message: "PIN requerido." });
+      // Mismo esquema de identidad que checkPlayerAuth, para que ambos caminos
+      // de verificación del PIN de un jugador compartan el mismo cupo de
+      // intentos (si no, bastaría atacar por acá para esquivar el límite).
+      const identidadLogin = "player_" + tab + "_" + playerId;
+      const bloqueoLogin = rateLimitCheck(identidadLogin);
+      if (bloqueoLogin) return jsonOut(bloqueoLogin);
       const storedHash = getValueFromSheet(sheet, "pin_" + playerId);
       if (!storedHash) {
         setKey(sheet, "pin_" + playerId, pinEnviado);
+        rateLimitRegistrarExito(identidadLogin);
         return jsonOut({ status: "success", nuevo: true });
       }
-      if (pinEnviado !== storedHash) return jsonOut({ status: "error", message: "PIN incorrecto." });
+      if (pinEnviado !== storedHash) {
+        rateLimitRegistrarFallo(identidadLogin);
+        return jsonOut({ status: "error", message: "PIN incorrecto." });
+      }
+      rateLimitRegistrarExito(identidadLogin);
       return jsonOut({ status: "success", nuevo: false });
     }
 
@@ -465,7 +482,43 @@ function isProtectedKey(key) {
   return PROTECTED_KEYS.indexOf(key) !== -1;
 }
 
+/* Rate limiting / fuerza bruta: antes nada impedía probar las 10.000
+   combinaciones de un PIN de 4 dígitos en bucle contra el backend. CacheService
+   guarda contadores por identidad (grupo, grupo+jugador, o "master") con
+   expiración automática — no toca el Sheet, así que un ataque en bucle no
+   suma cuota de lectura/escritura ni compite por el LockService global. Cada
+   identidad tiene su propio cupo: fallar a propósito el PIN de un jugador no
+   bloquea a los demás jugadores ni a otros grupos. */
+const RATE_LIMIT_MAX_INTENTOS = 6;
+const RATE_LIMIT_VENTANA_SEG = 600;  // ventana en la que se cuentan los fallos
+const RATE_LIMIT_BLOQUEO_SEG = 600;  // tiempo de bloqueo tras superar el límite
+function rateLimitCheck(identidad) {
+  if (CacheService.getScriptCache().get("rl_block_" + identidad)) {
+    Logger.log("Rate limit: \"" + identidad + "\" bloqueado por intentos fallidos repetidos.");
+    return { status: "error", message: "Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo." };
+  }
+  return null;
+}
+function rateLimitRegistrarFallo(identidad) {
+  const cache = CacheService.getScriptCache();
+  const actuales = Number(cache.get("rl_intentos_" + identidad) || "0") + 1;
+  if (actuales >= RATE_LIMIT_MAX_INTENTOS) {
+    cache.put("rl_block_" + identidad, "1", RATE_LIMIT_BLOQUEO_SEG);
+    cache.remove("rl_intentos_" + identidad);
+  } else {
+    cache.put("rl_intentos_" + identidad, String(actuales), RATE_LIMIT_VENTANA_SEG);
+  }
+}
+function rateLimitRegistrarExito(identidad) {
+  const cache = CacheService.getScriptCache();
+  cache.remove("rl_intentos_" + identidad);
+  cache.remove("rl_block_" + identidad);
+}
+
 function checkAdminAuth(sheet, pinEnviado) {
+  const identidad = "admin_" + sheet.getName();
+  const bloqueo = rateLimitCheck(identidad);
+  if (bloqueo) return bloqueo;
   const adminPinGuardado = getValueFromSheet(sheet, "adminPin");
   // Ya NO existe "primer set libre": todo grupo nace provisionado por el
   // administrador central (acción adminProvisionarGrupo), nunca por
@@ -476,20 +529,27 @@ function checkAdminAuth(sheet, pinEnviado) {
     // que poder diferenciar "el servidor rechazó el PIN" de "la petición ni
     // siquiera llegó bien" sin depender de capturar la respuesta a tiempo
     // en el navegador (así se tuvo que diagnosticar antes de este cambio).
+    rateLimitRegistrarFallo(identidad);
     Logger.log("checkAdminAuth rechazado en \"" + sheet.getName() + "\" (PIN " + (pinEnviado ? "no coincide" : "ausente") + ").");
     return { status: "error", message: "PIN de administrador inválido, ausente, o el grupo aún no ha sido creado por el administrador central." };
   }
+  rateLimitRegistrarExito(identidad);
   return null;
 }
 
 // Igual que checkAdminAuth pero por jugador — protege preds_<id> para que
 // nadie más pueda sobrescribir el pronóstico de otra persona sin su PIN.
 function checkPlayerAuth(sheet, playerId, pinEnviado) {
+  const identidad = "player_" + sheet.getName() + "_" + playerId;
+  const bloqueo = rateLimitCheck(identidad);
+  if (bloqueo) return bloqueo;
   const storedHash = getValueFromSheet(sheet, "pin_" + playerId);
   if (!storedHash || !pinEnviado || pinEnviado !== storedHash) {
+    rateLimitRegistrarFallo(identidad);
     Logger.log("checkPlayerAuth rechazado en \"" + sheet.getName() + "\" para " + playerId + " (PIN " + (pinEnviado ? "no coincide" : "ausente") + ").");
     return { status: "error", message: "PIN de jugador inválido o el jugador no ha iniciado sesión en este dispositivo." };
   }
+  rateLimitRegistrarExito(identidad);
   return null;
 }
 
