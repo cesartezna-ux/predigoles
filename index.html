@@ -26,16 +26,24 @@
   h1{font-family:var(--display);font-weight:400;margin:6px 0 2px;font-size:clamp(34px,9vw,52px);line-height:.92;letter-spacing:.5px;text-transform:uppercase}
   h1 .yr{color:var(--gold);-webkit-text-stroke:0}
   .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .notaeq{display:inline-flex;align-items:center;gap:4px}
   .whoami{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
   .chip{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:7px 12px;font-size:13px}
   .chip b{font-weight:700}
   .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint)}
   .link-btn{background:none;border:none;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:4px}
-  .keybtn{margin-left:auto;background:var(--panel);border:1px solid var(--faint);color:var(--muted);border-radius:10px;padding:7px 10px;font-size:13px;cursor:pointer}
-  .keybtn.on{color:var(--pitch);background:var(--gold);border-color:var(--gold);font-weight:700}
   .tabs{display:flex;gap:6px;position:static;z-index:20;padding:10px 0;background:var(--pitch)}
   .tab{flex:1;text-align:center;padding:11px 8px;border-radius:12px;cursor:pointer;background:var(--panel);border:1px solid var(--faint);color:var(--muted);font-weight:600;font-size:13.5px;letter-spacing:.02em}
   .tab.active{background:var(--raise);color:var(--line);border-color:rgba(255,200,69,.4)}
+  .tab.key{overflow:hidden}
+  .tab.key .tk-label{display:inline-block;max-width:0;opacity:0;overflow:hidden;white-space:nowrap;vertical-align:bottom;transition:max-width .3s ease,opacity .22s ease,margin-left .3s ease}
+  .tab.key.on{background:var(--raise);color:var(--line);border-color:rgba(255,200,69,.4)}
+  .tab.key.on .tk-label{max-width:100px;opacity:1}
+  @media (hover:hover){
+    .tab.key:not(.on):hover .tk-label{max-width:100px;opacity:1;margin-left:6px}
+  }
+  .eqcrest{display:inline-flex;align-items:center}
+  .eqcrest .crest{width:18px;height:18px;object-fit:contain;border-radius:4px}
   .datesel{display:flex;align-items:center;gap:8px;margin:16px 0 4px}
   .datechips{display:flex;gap:8px;overflow-x:auto;flex:1;padding:2px 1px;scrollbar-width:none;-ms-overflow-style:none}
   .datechips::-webkit-scrollbar{display:none}
@@ -280,12 +288,11 @@ async function activarTorneo(id){
   // funcionan aunque la API escriba el nombre distinto a como lo adivinamos.
   FIXTURE=partidos.map(r=>({id:r[0],g:r[1],home:nombreCanonico(r[3]),away:nombreCanonico(r[4]),kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio",custom:false}));
 }
-function flag(n){
-  const archivo=ESCUDOS[n];
-  const emoji=FLAG[n]||"⚽";
+function crestHtml(archivo,emoji){
   if(!archivo)return emoji;
   return`<img class="crest" src="/escudos/${archivo}" alt="" data-fallback="${escapeHtml(emoji)}" onerror="this.outerHTML=this.dataset.fallback">`;
 }
+function flag(n){return crestHtml(ESCUDOS[n],FLAG[n]||"⚽");}
 
 /* --- Storage --- */
 const CACHE={};
@@ -457,7 +464,7 @@ function renderShell(){
   const t=TOURNAMENTS[S.torneoId]||TOURNAMENTS[TOURNAMENT_DEFAULT];
   document.title=`Predigoles · ${t.nombre}`;
   const notaSeguimiento=(S.modoSeguimiento==="equipo"&&S.equiposSeguidos.length)
-    ?`<div class="sub" style="color:var(--mint);margin-top:2px">⚽ Este grupo sigue solo a: ${S.equiposSeguidos.map(escapeHtml).join(", ")}</div>`
+    ?`<div class="sub" style="color:var(--mint);margin-top:2px">⚽ Este grupo sigue solo a: ${S.equiposSeguidos.map(eq=>`<span class="notaeq">${flag(eq)}${escapeHtml(eq)}</span>`).join(", ")}</div>`
     :"";
   root.innerHTML=`
     <div class="topfijo">
@@ -469,7 +476,6 @@ function renderShell(){
         <div class="whoami">
           <span class="chip"><span class="dot"></span> Juegas como <b>${me?escapeHtml(me.ico+" "+me.name):"—"}</b></span>
           <button class="link-btn" id="changeName">cambiar</button>
-          <button class="keybtn ${S.organizer?"on":""}" id="orgBtn">🔑 Organizador</button>
         </div>
         <div class="mystats" id="mystats"></div>
         <div id="pendingBanner"></div>
@@ -478,37 +484,41 @@ function renderShell(){
         <div class="tab" data-v="partidos">Partidos</div>
         <div class="tab" data-v="envivo">En Vivo</div>
         <div class="tab" data-v="ranking">Ranking</div>
-        <div class="tab" data-v="resultados" style="display:none">Resultados</div>
+        <div class="tab key ${S.organizer?"on":""}" data-v="resultados" id="orgTab">🔑<span class="tk-label">&nbsp;Organizador</span></div>
       </div>
     </div>
     <div id="content"></div>`;
   document.getElementById("changeName").onclick=()=>showOnboarding(true);
-  document.getElementById("orgBtn").onclick=async()=>{
+  document.getElementById("orgTab").onclick=async()=>{
     if(S.organizer){
-      S.organizer=false;
-      S.organizerPinHash=null;
-      localStorage.removeItem("pg_pinhash_"+TAB);
-      await setJSON("organizer",false,false);
+      S.view="resultados";renderView();
+      return;
+    }
+    const ingresado=prompt("🔑 PIN de administrador:");
+    if(ingresado===null) return;
+    const intentoHash=_hashPin(ingresado.trim());
+    const r=await cloudCall({action:"loginOrganizador",pin:intentoHash});
+    if(r&&r.status==="success"){
+      S.organizer=true;
+      S.organizerPinHash=intentoHash;
+      localStorage.setItem("pg_pinhash_"+TAB,intentoHash);
+      await setJSON("organizer",true,false);
+      S.view="resultados";
       renderShell();renderView();
+      toast("Modo organizador activado ✓",false,3000);
     } else {
-      const ingresado=prompt("🔑 PIN de administrador:");
-      if(ingresado===null) return;
-      const intentoHash=_hashPin(ingresado.trim());
-      const r=await cloudCall({action:"loginOrganizador",pin:intentoHash});
-      if(r&&r.status==="success"){
-        S.organizer=true;
-        S.organizerPinHash=intentoHash;
-        localStorage.setItem("pg_pinhash_"+TAB,intentoHash);
-        await setJSON("organizer",true,false);
-        renderShell();renderView();
-        toast("Modo organizador activado ✓",false,3000);
-      } else {
-        toast((r&&r.message)||"PIN incorrecto.",true,3000);
-      }
+      toast((r&&r.message)||"PIN incorrecto.",true,3000);
     }
   };
-  document.getElementById("tabs").querySelectorAll(".tab").forEach(t=>{t.onclick=()=>{S.view=t.dataset.v;renderView();};});
-  const rt=document.querySelector('[data-v="resultados"]');if(rt)rt.style.display=S.organizer?"":"none";
+  document.getElementById("tabs").querySelectorAll('.tab:not(#orgTab)').forEach(t=>{t.onclick=()=>{S.view=t.dataset.v;renderView();};});
+}
+async function salirModoOrganizador(){
+  S.organizer=false;
+  S.organizerPinHash=null;
+  localStorage.removeItem("pg_pinhash_"+TAB);
+  await setJSON("organizer",false,false);
+  S.view="partidos";
+  renderShell();renderView();
 }
 
 function paintMyStats(){
@@ -576,9 +586,10 @@ function matchCardHtml(m){
   const whenInner=live
     ?`<span class="cd soon">🔴 ${live.minute!=null?live.minute+"'":"EN VIVO"} · ${tiempoDesde(live.syncedAt)}</span>`
     :sinFecha?"":`<span class="cd" id="cd_${m.id}"></span>`;
-  return`<div class="match" id="card_${m.id}">
+  const esDerby=S.modoSeguimiento==="equipo"&&S.equiposSeguidos.includes(m.home)&&S.equiposSeguidos.includes(m.away);
+  return`<div class="match${esDerby?" col":""}" id="card_${m.id}">
     <div class="mtop">
-      <span class="grp">${m.g}</span>
+      <span class="grp${esDerby?" colrib":""}">${esDerby?"⚡ Choque entre tus equipos":m.g}</span>
       <span class="when">${sinFecha?"📋 Fecha por confirmar":whenHtml(m.kick)}${whenInner}</span>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:4px;">📍 ${escapeHtml(m.venue)}</div>
@@ -903,7 +914,7 @@ function showModoSeguimiento(){
     </label>
     <div id="ms_equipos" style="margin-top:12px;max-height:220px;overflow-y:auto;display:${S.modoSeguimiento==="equipo"?"block":"none"}">
       ${equiposDisponibles.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px">
-        <input type="checkbox" class="ms_eq" value="${escapeHtml(eq)}" ${seguidosActuales.has(eq)?"checked":""}> ${escapeHtml(eq)}
+        <input type="checkbox" class="ms_eq" value="${escapeHtml(eq)}" ${seguidosActuales.has(eq)?"checked":""}> <span class="eqcrest">${flag(eq)}</span>${escapeHtml(eq)}
       </label>`).join("")}
     </div>
     <div id="ms_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
@@ -1094,6 +1105,7 @@ function renderResultados(c){
   });
   
   let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · Configura los clasificados con ✏️, la fecha/hora/sede con 📅 (solo mientras no tenga resultado), e ingresa marcadores.</div>`;
+  html+=`<div style="text-align:right;margin-bottom:10px"><button class="link-btn" id="rs_salir">🔑 salir del modo organizador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(54,224,191,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showModoSeguimiento()" style="background:var(--raise);color:var(--mint)">⚽ Modo de seguimiento (equipo o torneo completo)</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
@@ -1114,6 +1126,7 @@ function renderResultados(c){
     </div>`;
   }
   c.innerHTML=html;
+  document.getElementById("rs_salir").onclick=salirModoOrganizador;
 
   c.querySelectorAll(".editnm[data-side]").forEach(b=>{
     b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
@@ -1552,9 +1565,10 @@ function showCrearGrupo(){
   const torneoIds=Object.keys(TOURNAMENTS);
   const torneoOptions=torneoIds.map(id=>`<option value="${id}" ${id===TOURNAMENT_DEFAULT?"selected":""}>${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
   function listaEquiposHtml(torneoId){
-    const equipos=Object.keys((TOURNAMENTS[torneoId]||{}).FLAG||{}).sort();
+    const conf=TOURNAMENTS[torneoId]||{},flagsT=conf.FLAG||{},escudosT=conf.ESCUDOS||{};
+    const equipos=Object.keys(flagsT).sort();
     return equipos.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px">
-      <input type="checkbox" class="cg_eq" value="${escapeHtml(eq)}"> ${escapeHtml(eq)}
+      <input type="checkbox" class="cg_eq" value="${escapeHtml(eq)}"> <span class="eqcrest">${crestHtml(escudosT[eq],flagsT[eq]||"⚽")}</span>${escapeHtml(eq)}
     </label>`).join("");
   }
   ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
