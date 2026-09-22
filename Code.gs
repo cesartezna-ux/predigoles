@@ -293,6 +293,22 @@ function doPost(e) {
       return jsonOut({ status: "success" });
     }
 
+    // --- Guardar "modo de seguimiento" (torneo completo vs. uno o varios
+    // equipos) en UNA sola petición autenticada, no dos seguidas (antes era
+    // set("modoSeguimiento") + set("equiposSeguidos") por separado — si
+    // Apps Script tenía un hipo transitorio de infraestructura en cualquiera
+    // de las dos, el grupo podía quedar a medias, ej. modo "equipo" guardado
+    // pero equiposSeguidos vacío, lo que lo deja sin ver ningún partido). ---
+    if (action === "guardarSeguimiento") {
+      const authError = checkAdminAuth(sheet, body.pin);
+      if (authError) return jsonOut(authError);
+      const modo = (body.modoSeguimiento === "equipo") ? "equipo" : "torneo";
+      const equipos = Array.isArray(body.equiposSeguidos) ? body.equiposSeguidos : [];
+      setKey(sheet, "modoSeguimiento", JSON.stringify(modo));
+      setKey(sheet, "equiposSeguidos", JSON.stringify(equipos));
+      return jsonOut({ status: "success" });
+    }
+
     if (action === "joinRoster") {
       const player = body.player;
       if (!player || !player.id) return jsonOut({ status: "error", message: "player inválido" });
@@ -455,6 +471,12 @@ function checkAdminAuth(sheet, pinEnviado) {
   // administrador central (acción adminProvisionarGrupo), nunca por
   // autoconfiguración espontánea de quien abra el link primero.
   if (!adminPinGuardado || !pinEnviado || pinEnviado !== adminPinGuardado) {
+    // Registro mínimo: un rechazo de PIN no es una excepción, así que sin
+    // esto no queda ningún rastro en las Ejecuciones de Apps Script — hay
+    // que poder diferenciar "el servidor rechazó el PIN" de "la petición ni
+    // siquiera llegó bien" sin depender de capturar la respuesta a tiempo
+    // en el navegador (así se tuvo que diagnosticar antes de este cambio).
+    Logger.log("checkAdminAuth rechazado en \"" + sheet.getName() + "\" (PIN " + (pinEnviado ? "no coincide" : "ausente") + ").");
     return { status: "error", message: "PIN de administrador inválido, ausente, o el grupo aún no ha sido creado por el administrador central." };
   }
   return null;
@@ -465,6 +487,7 @@ function checkAdminAuth(sheet, pinEnviado) {
 function checkPlayerAuth(sheet, playerId, pinEnviado) {
   const storedHash = getValueFromSheet(sheet, "pin_" + playerId);
   if (!storedHash || !pinEnviado || pinEnviado !== storedHash) {
+    Logger.log("checkPlayerAuth rechazado en \"" + sheet.getName() + "\" para " + playerId + " (PIN " + (pinEnviado ? "no coincide" : "ausente") + ").");
     return { status: "error", message: "PIN de jugador inválido o el jugador no ha iniciado sesión en este dispositivo." };
   }
   return null;

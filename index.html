@@ -920,10 +920,17 @@ function showModoSeguimiento(){
     const equipos=[...document.querySelectorAll(".ms_eq:checked")].map(cb=>cb.value);
     if(modo==="equipo"&&!equipos.length){err.textContent="Elige al menos un equipo, o cambia a \"torneo completo\".";return;}
     await conCargando(document.getElementById("ms_save"),async()=>{
-      const okModo=await setJSONAuth("modoSeguimiento",modo);
-      const okEquipos=await setJSONAuth("equiposSeguidos",equipos);
-      if(!okModo||!okEquipos){err.textContent="No se pudo guardar.";return;}
+      // Una sola petición autenticada en vez de dos seguidas (modo +
+      // equipos por separado): menos superficie para que un hipo transitorio
+      // de Apps Script tumbe el guardado, y no puede quedar a medias.
+      const r=await cloudCall({action:"guardarSeguimiento",modoSeguimiento:modo,equiposSeguidos:equipos,pin:S.organizerPinHash});
+      if(!r||r.status!=="success"){
+        err.textContent=(r&&r.message)||"No se pudo conectar con el servidor. Intenta de nuevo.";
+        return;
+      }
       S.modoSeguimiento=modo;S.equiposSeguidos=equipos;
+      CACHE["modoSeguimiento"]=JSON.stringify(modo);
+      CACHE["equiposSeguidos"]=JSON.stringify(equipos);
       ov.remove();renderShell();renderView();
       toast("Modo de seguimiento actualizado ✓",false,3000);
     },"Guardando...");
