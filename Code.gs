@@ -490,6 +490,20 @@ function doGet(e) {
   return ContentService.createTextOutput(log).setMimeType(ContentService.MimeType.TEXT);
 }
 
+/* Parche de corto plazo para la demora de carga inicial (mientras se evalúa
+   migrar de Sheets/Apps Script a una base de datos real, que es la causa de
+   fondo): un disparador por tiempo que corre esta función cada 5-10 minutos
+   mantiene el runtime de Apps Script con más probabilidad de estar "tibio"
+   cuando llega un usuario real, en vez de pagar un cold start completo.
+   No hace ningún trabajo real a propósito (para no gastar cuota de la API de
+   resultados en vivo aparte del cron de sincronización que ya existe) — solo
+   toca el runtime. Actívalo en el editor de Apps Script: ⏰ Activadores →
+   Añadir activador → función "mantenerCalido" → basado en tiempo → cada 5 o
+   10 minutos. */
+function mantenerCalido() {
+  Logger.log("Ping de calentamiento " + new Date().toISOString());
+}
+
 /* ---------- SEGURIDAD ---------- */
 
 const PROTECTED_KEYS = ["results", "betting", "groupName", "adminPin", "teamOverrides", "modoSeguimiento", "equiposSeguidos"];
