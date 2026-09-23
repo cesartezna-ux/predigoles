@@ -54,14 +54,17 @@ function getOrCreateMasterSheet() {
 
 const APIFOOTBALL_BASE = "https://v3.football.api-sports.io";
 
-// Liga y temporada usadas HOY por la sincronización de resultados en vivo
-// (_sincronizar). Si más adelante corres varios torneos en vivo a la vez,
-// esto necesitaría generalizarse — por ahora sincroniza uno solo.
+// Torneos que la sincronización de resultados en vivo (_sincronizar) debe
+// mantener actualizados. Cada entrada aquí es un torneo más que se consulta
+// contra api-football en cada corrida del cron — agregar uno nuevo es agregar
+// una línea aquí (además de cargar su malla con cargarFixtureDesdeAPI).
 // ⚠️ Confirmar el ID de cada liga antes de usar (ver buscarLeagueIdColombia()
 // más abajo, o el buscador equivalente para otras ligas).
-const LEAGUE_ID = 239; // Liga BetPlay Colombia — confirmado
-const SEASON = 2026;
-const TORNEO_ACTIVO_SYNC = "fpc_2026_2"; // qué malla (ver _fixture_<id>) usa _sincronizar()
+const TORNEOS_SYNC = {
+  "fpc_2026_2": { leagueId: 239, season: 2026 },        // Liga BetPlay Colombia — confirmado
+  "la_liga_2026_27": { leagueId: 140, season: 2026 },
+  "champions_2026_27": { leagueId: 2, season: 2026 },
+};
 
 const TAB_NAME_RE = /^[a-zA-Z0-9_-]{1,40}$/;
 const HEADER = ["key", "value"];
@@ -352,7 +355,7 @@ function doPost(e) {
 
     if (action === "syncNow") {
       const resultado = _sincronizar();
-      return jsonOut({ status: "success", sincronizados: resultado.sincronizados, enVivo: resultado.enVivo, limpiados: resultado.limpiados, total: resultado.total, sinMapear: resultado.sinMapear, error: resultado.error || null });
+      return jsonOut({ status: "success", sincronizados: resultado.sincronizados, enVivo: resultado.enVivo, limpiados: resultado.limpiados, total: resultado.total, sinMapear: resultado.sinMapear, error: (resultado.errores && resultado.errores.length) ? resultado.errores.join(" | ") : null });
     }
 
     return jsonOut({ status: "error", message: "acción desconocida: " + action });
@@ -780,12 +783,15 @@ function repararPinesLegacy() {
 }
 
 /**
- * Sincroniza resultados y marcadores en vivo desde api-football.com.
+ * Sincroniza resultados y marcadores en vivo de UN torneo desde api-football.com.
  * Trae TODA la temporada de la liga en una sola llamada (barato en cuota:
  * 1 request, sin importar cuántos partidos devuelva) y filtra localmente.
+ * Devuelve los resultados calculados sin escribirlos todavía — quien la llama
+ * (_sincronizar) decide en qué pestañas de grupo aplicarlos, según cuál
+ * torneo sigue cada uno.
  */
-function _sincronizar() {
-  const fixtureTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("_fixture_" + TORNEO_ACTIVO_SYNC);
+function _sincronizarTorneo(torneoId, leagueId, season) {
+  const fixtureTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("_fixture_" + torneoId);
   const fixtureRaw = fixtureTab ? getValueFromSheet(fixtureTab, "partidos") : null;
   let fixtureList = [];
   try { fixtureList = fixtureRaw ? JSON.parse(fixtureRaw) : []; } catch (e) {}
@@ -794,30 +800,30 @@ function _sincronizar() {
   const FIXTURE_ACTUAL = fixtureList.map(function (r) { return { id: r[0], home: r[3], away: r[4] }; });
 
   if (!APIFOOTBALL_KEY) {
-    return { error: "Falta configurar APIFOOTBALL_KEY en Propiedades del proyecto.", sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+    return { error: "Falta configurar APIFOOTBALL_KEY en Propiedades del proyecto.", syncedResults: {}, syncedLive: {}, sinMapear: [], aLimpiar: [], total: FIXTURE_ACTUAL.length };
   }
-  if (!LEAGUE_ID) {
-    return { error: "Falta confirmar LEAGUE_ID.", sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+  if (!leagueId) {
+    return { error: "Falta leagueId para \"" + torneoId + "\" en TORNEOS_SYNC.", syncedResults: {}, syncedLive: {}, sinMapear: [], aLimpiar: [], total: FIXTURE_ACTUAL.length };
   }
   if (!FIXTURE_ACTUAL.length) {
-    return { error: "La malla de \"" + TORNEO_ACTIVO_SYNC + "\" está vacía — corre cargarFixtureDesdeAPI() primero.", sincronizados: 0, total: 0, sinMapear: [], clientes: [] };
+    return { error: "La malla de \"" + torneoId + "\" está vacía — corre cargarFixtureDesdeAPI() primero.", syncedResults: {}, syncedLive: {}, sinMapear: [], aLimpiar: [], total: 0 };
   }
 
   let apiMatches;
   try {
-    const url = APIFOOTBALL_BASE + "/fixtures?league=" + LEAGUE_ID + "&season=" + SEASON;
+    const url = APIFOOTBALL_BASE + "/fixtures?league=" + leagueId + "&season=" + season;
     const resp = UrlFetchApp.fetch(url, { headers: { "x-apisports-key": APIFOOTBALL_KEY }, muteHttpExceptions: true });
     const code = resp.getResponseCode();
     if (code !== 200) {
-      return { error: "Error API (HTTP " + code + ")", sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+      return { error: "Error API (HTTP " + code + ")", syncedResults: {}, syncedLive: {}, sinMapear: [], aLimpiar: [], total: FIXTURE_ACTUAL.length };
     }
     const parsed = JSON.parse(resp.getContentText());
     if (parsed.errors && Object.keys(parsed.errors).length) {
-      return { error: "API respondió con error: " + JSON.stringify(parsed.errors), sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+      return { error: "API respondió con error: " + JSON.stringify(parsed.errors), syncedResults: {}, syncedLive: {}, sinMapear: [], aLimpiar: [], total: FIXTURE_ACTUAL.length };
     }
     apiMatches = parsed.response || [];
   } catch (err) {
-    return { error: "Error consultando la API: " + err, sincronizados: 0, total: FIXTURE_ACTUAL.length, sinMapear: [], clientes: [] };
+    return { error: "Error consultando la API: " + err, syncedResults: {}, syncedLive: {}, sinMapear: [], aLimpiar: [], total: FIXTURE_ACTUAL.length };
   }
 
   // Estados de api-football.com: NS (no iniciado), 1H/HT/2H/ET/BT/P (en juego),
@@ -947,37 +953,85 @@ function _sincronizar() {
     sinMapear.push(m.home + " vs " + m.away + " (id " + m.id + ")");
   });
 
+  return {
+    error: null,
+    syncedResults: syncedResults,
+    syncedLive: syncedLive,
+    sinMapear: sinMapear,
+    aLimpiar: aLimpiar,
+    total: FIXTURE_ACTUAL.length,
+  };
+}
+
+// Lee torneoId de un grupo tal como lo guarda adminProvisionarGrupo (JSON.stringify) —
+// con respaldo a texto plano por si algún grupo viejo lo tuviera sin envolver.
+function torneoDeSheet(sheet) {
+  const raw = getValueFromSheet(sheet, "torneoId");
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return raw; }
+}
+
+/**
+ * Orquesta la sincronización de TODOS los torneos activos (TORNEOS_SYNC) y
+ * aplica cada resultado solo a los grupos que siguen ESE torneo — antes solo
+ * existía un torneo en sincronización, así que empujar el mismo resultado a
+ * todos los grupos por igual no causaba daño; con varios torneos a la vez,
+ * un grupo de La Liga no debe recibir (ni depender de) los resultados del FPC.
+ * Si un torneo falla al consultar la API, los demás igual se sincronizan —
+ * antes un solo error tumbaba la corrida completa.
+ */
+function _sincronizar() {
+  const porTorneo = {};
+  const errores = [];
+  let totalGeneral = 0, sincronizadosTotal = 0, enVivoTotal = 0, sinMapearTotal = [];
+
+  Object.keys(TORNEOS_SYNC).forEach(function (torneoId) {
+    const cfg = TORNEOS_SYNC[torneoId];
+    const r = _sincronizarTorneo(torneoId, cfg.leagueId, cfg.season);
+    porTorneo[torneoId] = r;
+    totalGeneral += r.total;
+    if (r.error) { errores.push(torneoId + ": " + r.error); return; }
+    sincronizadosTotal += Object.keys(r.syncedResults).length;
+    enVivoTotal += Object.keys(r.syncedLive).length;
+    if (r.sinMapear.length) sinMapearTotal = sinMapearTotal.concat(r.sinMapear.map(function (s) { return torneoId + ": " + s; }));
+  });
+
   const tenantSheets = getAllTenantSheets();
   let limpiados = 0;
   tenantSheets.forEach(function (sheet) {
+    const torneoId = torneoDeSheet(sheet);
+    const r = porTorneo[torneoId];
+    if (!r || r.error) return; // grupo con torneo sin sincronización configurada, o que falló esta corrida: no tocar sus datos
+
     const currentResultsRaw = getValueFromSheet(sheet, "results");
     let currentResults = {};
     try { currentResults = currentResultsRaw ? JSON.parse(currentResultsRaw) : {}; } catch (e) {}
-    Object.keys(syncedResults).forEach(function (id) { currentResults[id] = syncedResults[id]; });
-    aLimpiar.forEach(function (id) {
+    Object.keys(r.syncedResults).forEach(function (id) { currentResults[id] = r.syncedResults[id]; });
+    r.aLimpiar.forEach(function (id) {
       if (Object.prototype.hasOwnProperty.call(currentResults, id)) { delete currentResults[id]; limpiados++; }
     });
     setKey(sheet, "results", JSON.stringify(currentResults));
-    setKey(sheet, "live", JSON.stringify(syncedLive));
+    setKey(sheet, "live", JSON.stringify(r.syncedLive));
   });
 
   return {
-    sincronizados: Object.keys(syncedResults).length,
-    enVivo: Object.keys(syncedLive).length,
+    sincronizados: sincronizadosTotal,
+    enVivo: enVivoTotal,
     limpiados: limpiados,
-    total: FIXTURE_ACTUAL.length,
-    sinMapear: sinMapear,
+    total: totalGeneral,
+    sinMapear: sinMapearTotal,
+    errores: errores,
     clientes: tenantSheets.map(function (s) { return s.getName(); }),
   };
 }
 
 function cronSincronizarResultados() {
   const r = _sincronizar();
-  if (r.error) { Logger.log(r.error); return r.error; }
   const lines = [];
   lines.push("Partidos sincronizados: " + r.sincronizados + "/" + r.total);
   lines.push("En vivo ahora: " + (r.enVivo || 0));
   if (r.limpiados) lines.push("Marcadores viejos limpiados (partidos que resultaron no jugados): " + r.limpiados);
+  if (r.errores && r.errores.length) lines.push("Errores por torneo: " + r.errores.join(" | "));
   if (r.sinMapear.length) lines.push("Pendientes o sin mapear: " + r.sinMapear.join(" | "));
   lines.push("Actualizado en " + r.clientes.length + " cliente(s): " + r.clientes.join(", "));
   const out = lines.join("\n");
@@ -992,7 +1046,8 @@ function runManualSyncTest() {
 /**
  * Ayuda de una sola vez: llama esto (▶ run buscarLeagueIdColombia) para que el
  * log te diga el ID exacto de la Liga BetPlay en api-football.com — pégalo en
- * LEAGUE_ID arriba y ya queda resuelto para siempre.
+ * el leagueId del torneo correspondiente dentro de TORNEOS_SYNC (arriba) y ya
+ * queda resuelto para siempre.
  */
 function buscarLeagueIdColombia() {
   if (!APIFOOTBALL_KEY) { Logger.log("Falta configurar APIFOOTBALL_KEY primero."); return; }
