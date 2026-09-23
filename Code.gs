@@ -125,18 +125,26 @@ function cargarFixtureDesdeAPI(torneoId, leagueId, season, roundContains) {
     });
   }
 
+  // api-football manda el escudo oficial de cada equipo en cada partido
+  // (teams.home/away.logo, una URL a su propio CDN de imágenes) — se
+  // recolecta aparte del fixture para no repetirla en cada fila de partido.
+  const escudos = {};
   const partidos = response.map(function (m) {
     // status.short "TBD" = fecha/hora todavía no confirmada por la liga.
     const kick = m.fixture.status.short === "TBD" ? "" : m.fixture.date;
     const venue = (m.fixture.venue && m.fixture.venue.name)
       ? m.fixture.venue.name + (m.fixture.venue.city ? ", " + m.fixture.venue.city : "")
       : "Estadio por confirmar";
+    const nombreHome = traducirEquipo(m.teams.home.name);
+    const nombreAway = traducirEquipo(m.teams.away.name);
+    if (m.teams.home.logo) escudos[nombreHome] = m.teams.home.logo;
+    if (m.teams.away.logo) escudos[nombreAway] = m.teams.away.logo;
     return [
       "af_" + m.fixture.id,
       String(m.league.round || ""),
       kick,
-      traducirEquipo(m.teams.home.name),
-      traducirEquipo(m.teams.away.name),
+      nombreHome,
+      nombreAway,
       venue,
     ];
   });
@@ -149,7 +157,8 @@ function cargarFixtureDesdeAPI(torneoId, leagueId, season, roundContains) {
 
   const tab = getOrCreateFixtureTab(torneoId);
   setKey(tab, "partidos", json);
-  Logger.log("Cargados " + partidos.length + " partidos para \"" + torneoId + "\" (liga " + leagueId + ", temporada " + season + (roundContains ? ", fase \"" + roundContains + "\"" : "") + ").");
+  setKey(tab, "escudos", JSON.stringify(escudos));
+  Logger.log("Cargados " + partidos.length + " partidos y " + Object.keys(escudos).length + " escudos para \"" + torneoId + "\" (liga " + leagueId + ", temporada " + season + (roundContains ? ", fase \"" + roundContains + "\"" : "") + ").");
 }
 
 /* api-football.com a veces usa nombres oficiales ligeramente distintos a los
@@ -214,11 +223,14 @@ function doPost(e) {
     const torneoId = sanitizeTab(String(body.torneoId || ""));
     if (!torneoId) return jsonOut({ status: "error", message: "torneoId inválido." });
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("_fixture_" + torneoId);
-    if (!sheet) return jsonOut({ status: "success", partidos: [] });
+    if (!sheet) return jsonOut({ status: "success", partidos: [], escudos: {} });
     const raw = getValueFromSheet(sheet, "partidos");
     let partidos = [];
     try { partidos = raw ? JSON.parse(raw) : []; } catch (e) {}
-    return jsonOut({ status: "success", partidos: partidos });
+    const rawEscudos = getValueFromSheet(sheet, "escudos");
+    let escudos = {};
+    try { escudos = rawEscudos ? JSON.parse(rawEscudos) : {}; } catch (e) {}
+    return jsonOut({ status: "success", partidos: partidos, escudos: escudos });
   }
 
   let tabRaw = body.tab || "kv1";

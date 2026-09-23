@@ -282,7 +282,13 @@ async function activarTorneo(id){
   let partidos=[];
   try{
     const r=await cloudCall({action:"getFixture",torneoId:id});
-    if(r&&r.status==="success")partidos=r.partidos||[];
+    if(r&&r.status==="success"){
+      partidos=r.partidos||[];
+      // Escudos que trae api-football junto al fixture, para equipos sin
+      // escudo local curado a mano todavía -- los locales (ESCUDOS de cada
+      // torneo en TOURNAMENTS, como los del FPC) siempre ganan si existen.
+      if(r.escudos)ESCUDOS=Object.assign({},r.escudos,t.ESCUDOS);
+    }
   }catch(e){console.error("No se pudo cargar la malla del torneo:",e);}
   // nombreCanonico() absorbe diferencias de tilde/mayúscula entre lo que devuelve
   // la API y nuestros nombres — así el filtro de "seguir equipo" y los escudos
@@ -291,7 +297,11 @@ async function activarTorneo(id){
 }
 function crestHtml(archivo,emoji){
   if(!archivo)return emoji;
-  return`<img class="crest" src="/escudos/${archivo}" alt="" data-fallback="${escapeHtml(emoji)}" onerror="this.outerHTML=this.dataset.fallback">`;
+  // ESCUDOS puede traer un nombre de archivo local (/escudos/xxx.png, como en
+  // FPC) o una URL completa (el logo que manda api-football para los demás
+  // torneos) -- se detecta cuál es en vez de asumir siempre archivo local.
+  const src=/^https?:\/\//.test(archivo)?archivo:"/escudos/"+archivo;
+  return`<img class="crest" src="${src}" alt="" data-fallback="${escapeHtml(emoji)}" onerror="this.outerHTML=this.dataset.fallback">`;
 }
 function flag(n){return crestHtml(ESCUDOS[n],FLAG[n]||"⚽");}
 
