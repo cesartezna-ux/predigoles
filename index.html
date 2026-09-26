@@ -1228,13 +1228,19 @@ function renderResultados(c){
     const scoreAway=m.custom
       ?`<input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}">`
       :`<span class="box" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">${r.a!=null?r.a:"–"}</span>`;
+    // El botón de "editar nombre" es para llaves de eliminación con equipo
+    // aún por definir -- una vez el partido ya tiene resultado, los equipos
+    // ya son un hecho histórico y no deben poder reetiquetarse (misma
+    // guardia que btnFecha arriba).
+    const btnEditHome=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>`;
+    const btnEditAway=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>`;
     html+=`<div class="match" style="border-radius:14px">
       <div class="mtop"><span class="grp">🏆 ${m.g}</span>
       <span class="when">${cuandoLabel} ${btnFecha}</span></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}${m.custom?"":" · resultado sincronizado automáticamente"}</div>
-      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>${scoreHome}</div>
+      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span>${btnEditHome}${scoreHome}</div>
       <div class="divider"></div>
-      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span><button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>${scoreAway}</div>
+      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span>${btnEditAway}${scoreAway}</div>
     </div>`;
   }
   c.innerHTML=html;
