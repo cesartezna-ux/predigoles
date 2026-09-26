@@ -1142,7 +1142,7 @@ function renderResultados(c){
     return b.kick-a.kick;
   });
   
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · Configura los clasificados con ✏️, la fecha/hora/sede con 📅 (solo mientras no tenga resultado), e ingresa marcadores.</div>`;
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · Edita el equipo de tus partidos personalizados con ✏️, la fecha/hora/sede con 📅 (solo mientras no tenga resultado), e ingresa marcadores.</div>`;
   html+=`<div style="text-align:right;margin-bottom:10px"><button class="link-btn" id="rs_salir">🔑 salir del modo organizador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(54,224,191,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showModoSeguimiento()" style="background:var(--raise);color:var(--mint)">⚽ Modo de seguimiento (equipo o torneo completo)</button></div>`;
@@ -1154,12 +1154,13 @@ function renderResultados(c){
     const tieneResultado=!!S.results[m.id];
     const cuandoLabel=sinFecha?`<span style="color:var(--flare)">📋 Sin fecha confirmada</span>`:`${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}`;
     const btnFecha=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`;
-    // El botón de "editar nombre" es para llaves de eliminación con equipo
-    // aún por definir (ej. "Ganador Grupo A") -- una vez el partido ya tiene
-    // resultado, los equipos ya son un hecho histórico y no deben poder
-    // reetiquetarse (misma guardia que ya tenía btnFecha arriba).
-    const btnEditHome=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>`;
-    const btnEditAway=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>`;
+    // Decisión de producto: si el partido viene de la API (calendario oficial,
+    // incluyendo fases eliminatorias), el admin NUNCA debe poder asignarle
+    // equipos -- ni siquiera con resultado pendiente. Solo los partidos
+    // personalizados (creados por el organizador, sin fuente en ninguna API)
+    // admiten esta edición.
+    const btnEditHome=m.custom?`<button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>`:"";
+    const btnEditAway=m.custom?`<button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>`:"";
     html+=`<div class="match" style="border-radius:14px">
       <div class="mtop"><span class="grp">🏆 ${m.g}</span>
       <span class="when">${cuandoLabel} ${btnFecha}</span></div>
