@@ -187,6 +187,16 @@
 
 <script>
 const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KSrvVowdHXk7bi5ldBeqcR0_ELzhhhwBsnLOhUTkUlgZkct/exec";
+// --- Supabase (migración en curso, rama supabase-migration) ---
+// SUPABASE_ANON_KEY es la llave PÚBLICA, diseñada para ir en el cliente --
+// la protección real de los datos la da RLS (negar por defecto salvo
+// lectura pública de fixtures/fixture_results/team_crests), no ocultar
+// esta llave. La llave de servicio (con acceso total) nunca sale de las
+// Edge Functions.
+const SUPABASE_URL="https://advdcsdcknschwgfilme.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkdmRjc2Rja25zY2h3Z2ZpbG1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4MTQ2ODksImV4cCI6MjEwNTM5MDY4OX0.Dg1z50NpHVMTtEMxuu-eSf1VlkC1U1cKM_hZtv_dL3A";
+const FUNCTIONS_URL=SUPABASE_URL+"/functions/v1";
+const REST_URL=SUPABASE_URL+"/rest/v1";
 
 /* --- Multi-tenant con soporte para ?grupo= o ?tab= --- */
 const _qp=new URLSearchParams(location.search);
@@ -306,21 +316,42 @@ async function activarTorneo(id){
   ALLOWED_TEAMS=Object.keys(FLAG).concat(t.EXTRA_ALLOWED||[]).sort();
   EQUIPO_CANONICO={};
   Object.keys(FLAG).forEach(nombre=>{EQUIPO_CANONICO[normalizarEquipo(nombre)]=nombre;});
-  let partidos=[];
+  let fixturesRows=[];
   try{
-    const r=await cloudCall({action:"getFixture",torneoId:id});
-    if(r&&r.status==="success"){
-      partidos=r.partidos||[];
+    // fixtures/team_crests son públicas (RLS "using (true)" para lectura) --
+    // se leen directo de Postgres, sin pasar por una Edge Function, igual
+    // que getFixture antes no exigía PIN.
+    const idEnc=encodeURIComponent(id);
+    const [fr,er]=await Promise.all([
+      restCall(`fixtures?torneo_id=eq.${idEnc}&select=match_id,fase,kickoff,home,away,venue`),
+      restCall(`team_crests?torneo_id=eq.${idEnc}&select=team_name,crest_url`),
+    ]);
+    fixturesRows=fr||[];
+    if(er){
+      const remotos={};
+      er.forEach(e=>{remotos[e.team_name]=e.crest_url;});
       // Escudos que trae api-football junto al fixture, para equipos sin
       // escudo local curado a mano todavía -- los locales (ESCUDOS de cada
       // torneo en TOURNAMENTS, como los del FPC) siempre ganan si existen.
-      if(r.escudos)ESCUDOS=Object.assign({},r.escudos,t.ESCUDOS);
+      ESCUDOS=Object.assign({},remotos,t.ESCUDOS);
     }
   }catch(e){console.error("No se pudo cargar la malla del torneo:",e);}
   // nombreCanonico() absorbe diferencias de tilde/mayúscula entre lo que devuelve
   // la API y nuestros nombres — así el filtro de "seguir equipo" y los escudos
   // funcionan aunque la API escriba el nombre distinto a como lo adivinamos.
-  FIXTURE=partidos.map(r=>({id:r[0],g:r[1],home:nombreCanonico(r[3]),away:nombreCanonico(r[4]),kick:r[2]?new Date(r[2]).getTime():null,venue:r[5]||"Estadio",custom:false}));
+  FIXTURE=fixturesRows.map(r=>({id:r.match_id,g:r.fase,home:nombreCanonico(r.home),away:nombreCanonico(r.away),kick:r.kickoff?new Date(r.kickoff).getTime():null,venue:r.venue||"Estadio",custom:false}));
+}
+// Resultados/en vivo oficiales -- compartidos por torneo (fixture_results),
+// ya no duplicados por grupo como en el modelo anterior. Devuelve las dos
+// piezas en la misma forma que S.results/S.live ya esperaban.
+async function cargarResultadosDelTorneo(torneoId){
+  const rows=await restCall(`fixture_results?torneo_id=eq.${encodeURIComponent(torneoId)}&select=match_id,home_score,away_score,status,minute,synced_at`);
+  const results={},live={};
+  (rows||[]).forEach(row=>{
+    if(row.status==null)results[row.match_id]={h:String(row.home_score),a:String(row.away_score)};
+    else live[row.match_id]={h:String(row.home_score),a:String(row.away_score),minute:row.minute,syncedAt:row.synced_at};
+  });
+  return{results,live};
 }
 function crestHtml(archivo,emoji){
   if(!archivo)return emoji;
@@ -331,6 +362,29 @@ function crestHtml(archivo,emoji){
   return`<img class="crest" src="${src}" alt="" data-fallback="${escapeHtml(emoji)}" onerror="this.outerHTML=this.dataset.fallback">`;
 }
 function flag(n){return crestHtml(ESCUDOS[n],FLAG[n]||"⚽");}
+
+/* --- Supabase: Edge Functions + lectura directa (fixtures/resultados/
+   escudos, públicos vía RLS) -- fetch() plano, sin librería, igual de
+   simple que cloudCall(). Todo lo migrado a Supabase pasa por acá; lo que
+   sigue en Apps Script (mientras se completa la reconexión) sigue usando
+   cloudCall()/SCRIPT_URL más abajo, sin tocarse. */
+async function edgeCall(fnName,payload){
+  try{
+    const r=await fetch(`${FUNCTIONS_URL}/${fnName}`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY},
+      body:JSON.stringify({...payload,tab:TAB}),
+    });
+    return await r.json();
+  }catch(e){console.error("edgeCall error",fnName,e);return null;}
+}
+async function restCall(pathAndQuery){
+  try{
+    const r=await fetch(`${REST_URL}/${pathAndQuery}`,{headers:{"apikey":SUPABASE_ANON_KEY,"Authorization":"Bearer "+SUPABASE_ANON_KEY}});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){console.error("restCall error",pathAndQuery,e);return null;}
+}
 
 /* --- Storage --- */
 const CACHE={};
@@ -535,7 +589,7 @@ function renderShell(){
     const ingresado=prompt("🔑 PIN de administrador:");
     if(ingresado===null) return;
     const intentoHash=_hashPin(ingresado.trim());
-    const r=await cloudCall({action:"loginOrganizador",pin:intentoHash});
+    const r=await edgeCall("login-organizador",{pin:intentoHash});
     if(r&&r.status==="success"){
       S.organizer=true;
       S.organizerPinHash=intentoHash;
@@ -1227,7 +1281,7 @@ async function showOnboarding(isChange){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
-  const roster=(await getJSON("roster",true))||[];
+  const roster=S.roster||[]; // ya viene fresco de estado-grupo (boot/refreshShared)
 
   function renderSelectScreen(){
     pendingIco=AVATARS[0];
@@ -1278,7 +1332,7 @@ async function showOnboarding(isChange){
       const pin=pi.value.trim();
       if(pin.length<4){document.getElementById("pin_err").textContent="El PIN debe tener 4 dígitos.";return;}
       await conCargando(document.getElementById("enterBtn"),async()=>{
-        const r=await cloudCall({action:"loginJugador",playerId:player.id,pin:_hashPin(pin)});
+        const r=await edgeCall("login-jugador",{playerId:player.id,pin:_hashPin(pin)});
         if(!r||r.status!=="success"){
           document.getElementById("pin_err").textContent=(r&&r.message)||"PIN incorrecto.";
           pi.value="";pi.focus();return;
@@ -1335,21 +1389,31 @@ async function showOnboarding(isChange){
       await conCargando(btn,async()=>{
         const newId="p_"+Math.random().toString(36).slice(2,9);
         const pinHash=_hashPin(pin1);
-        const rLogin=await cloudCall({action:"loginJugador",playerId:newId,pin:pinHash});
-        if(!rLogin||rLogin.status!=="success"){
-          err.textContent=(rLogin&&rLogin.message)||"No se pudo registrar el PIN. Intenta de nuevo.";
-          return;
-        }
+        // Unirse al grupo ANTES de fijar el PIN -- login-jugador exige que
+        // el jugador ya exista en la tabla (a diferencia del modelo viejo
+        // en Sheets, donde el PIN y el roster eran claves independientes
+        // y el orden no importaba).
         S.me={id:newId,name,ico:pendingIco};
-        await setJSON("me",S.me,false);
-        S.mePinHash=pinHash;
-        localStorage.setItem("pg_pinp_"+TAB+"_"+newId,pinHash);
         const r=await joinRoster();
         if(r&&r.status==="name_taken"){
           err.textContent="Nombre ocupado justo ahora.";
-          S.me=null;await setJSON("me",null,false);
+          S.me=null;
           return;
         }
+        if(!r||r.status!=="success"){
+          err.textContent=(r&&r.message)||"No se pudo registrar. Intenta de nuevo.";
+          S.me=null;
+          return;
+        }
+        const rLogin=await edgeCall("login-jugador",{playerId:newId,pin:pinHash});
+        if(!rLogin||rLogin.status!=="success"){
+          err.textContent=(rLogin&&rLogin.message)||"No se pudo registrar el PIN. Intenta de nuevo.";
+          S.me=null;
+          return;
+        }
+        await setJSON("me",S.me,false);
+        S.mePinHash=pinHash;
+        localStorage.setItem("pg_pinp_"+TAB+"_"+newId,pinHash);
         ov.remove();renderShell();renderView();
         toast(`¡Bienvenido ${name}!`,false,5000);
       },"Registrando...");
@@ -1361,8 +1425,9 @@ async function showOnboarding(isChange){
     await setJSON("me",S.me,false);
     S.mePinHash=_hashPin(pin);
     localStorage.setItem("pg_pinp_"+TAB+"_"+player.id,S.mePinHash);
-    await _migrarPronosticos(player.id);
-    S.predsMe=(await getJSON("preds_"+player.id,true))||{};
+    // S.allPreds ya viene completo desde estado-grupo (boot) -- no hace
+    // falta un fetch aparte por jugador como antes.
+    S.predsMe=S.allPreds[player.id]||{};
     await joinRoster();
     ov.remove();renderShell();renderView();
     if(!isFirstTime)toast(`¡Hola ${player.name}!`,false,3000);
@@ -1376,32 +1441,17 @@ async function showOnboarding(isChange){
 }
 
 async function joinRoster(){
-  const r=await cloudCall({action:"joinRoster",player:S.me});
+  const r=await edgeCall("join-grupo",{player:S.me});
   if(r&&r.status==="success"&&r.roster){
     S.roster=r.roster;
-    CACHE["roster"]=JSON.stringify(r.roster);
   } else if(!(r&&r.status==="name_taken")&&!S.roster.some(p=>p.id===S.me.id)){
     S.roster.push(S.me);
   }
   return r;
 }
 
-async function _migrarPronosticos(targetId){
-  try{
-    const existing=await getJSON("preds_"+targetId,true);
-    if(existing&&Object.keys(existing).length>0)return;
-    const roster=(await getJSON("roster",true))||[];
-    const myName=S.me.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-    const oldEntry=roster.find(p=>p.id!==targetId&&p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")===myName&&p.id.startsWith("p_"));
-    if(oldEntry){
-      const oldPreds=await getJSON("preds_"+oldEntry.id,true);
-      if(oldPreds&&Object.keys(oldPreds).length>0)await setJSONPlayerAuth("preds_"+targetId,oldPreds);
-    }
-  }catch(e){console.error("Error migrando:",e);}
-}
-
 async function showPinReset(){
-  const roster=(await getJSON("roster",true))||[];
+  const roster=S.roster||[];
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   ov.innerHTML=`<div class="card">
@@ -1420,7 +1470,7 @@ async function showPinReset(){
     btn.onclick=async()=>{
       const pl=roster.find(p=>p.id===btn.dataset.id);if(!pl)return;
       await conCargando(btn,async()=>{
-        const r=await cloudCall({action:"resetearPinJugador",playerId:pl.id,pin:S.organizerPinHash});
+        const r=await edgeCall("resetear-pin-jugador",{playerId:pl.id,pin:S.organizerPinHash});
         if(r&&r.status==="success"){
           ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
         } else {
@@ -1455,22 +1505,39 @@ setInterval(tick,1000);
 async function refreshShared(){
   if(ES_PANEL_CENTRAL)return;
   try{
-    const ok=await fetchAllShared();if(!ok)return;
-    const roster=(await getJSON("roster",true))||S.roster;
-    const results=(await getJSON("results",true))||{};
-    const custom=(await getJSON("custom",true))||[];
+    const r=await edgeCall("estado-grupo",{});
+    if(!r||r.status!=="success"||!r.group)return;
+
+    const roster=r.roster||S.roster;
+    const custom=(r.customMatches||[]).map(c=>({id:c.id,g:c.fase||"Extra",home:c.home,away:c.away,kick:c.kickoff?new Date(c.kickoff).getTime():null,venue:c.venue||"Estadio Asignado"}));
     S.roster=roster;S.custom=custom;
-    S.live=(await getJSON("live",true))||{};
-    S.betting=(await getJSON("betting",true))||S.betting;
-    S.modoSeguimiento=(await getJSON("modoSeguimiento",true))||S.modoSeguimiento;
-    S.equiposSeguidos=(await getJSON("equiposSeguidos",true))||S.equiposSeguidos;
+    S.betting=r.group.betting||S.betting;
+    S.teamOverrides=r.group.teamOverrides||S.teamOverrides;
+    S.modoSeguimiento=r.group.modoSeguimiento||S.modoSeguimiento;
+    S.equiposSeguidos=r.group.equiposSeguidos||S.equiposSeguidos;
+
+    const{results:resultsOficiales,live}=await cargarResultadosDelTorneo(S.torneoId);
+    const resultsPersonalizados={};
+    (r.customMatches||[]).forEach(c=>{
+      if(c.homeScore!=null&&c.awayScore!=null)resultsPersonalizados[c.id]={h:String(c.homeScore),a:String(c.awayScore)};
+    });
+    const results=Object.assign({},resultsOficiales,resultsPersonalizados);
+    S.live=live;
     const resChanged=JSON.stringify(results)!==JSON.stringify(S.results);
     S.results=results;
+
     const preds={};
-    for(const pl of roster)preds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
+    for(const pid in(r.predictions||{})){
+      const p={};
+      for(const mid in r.predictions[pid]){
+        const pr=r.predictions[pid][mid];
+        p[mid]={h:pr.h!=null?String(pr.h):null,a:pr.a!=null?String(pr.a):null};
+      }
+      preds[pid]=p;
+    }
     S.allPreds=preds;
     if(S.me){
-      const fresh=(await getJSON("preds_"+S.me.id,true))||{};
+      const fresh=S.allPreds[S.me.id]||{};
       for(const id of S.dirty)if(S.predsMe[id]!=null)fresh[id]=S.predsMe[id];
       const changed=JSON.stringify(fresh)!==JSON.stringify(S.predsMe);
       S.predsMe=fresh;S.allPreds[S.me.id]=Object.assign({},S.predsMe);
@@ -1708,32 +1775,57 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
     S.mePinHash=S.me?localStorage.getItem("pg_pinp_"+TAB+"_"+S.me.id):null;
     S.organizer=(await getJSON("organizer",false))||false;
     S.organizerPinHash=S.organizer?localStorage.getItem("pg_pinhash_"+TAB):null;
-    const conectado=await fetchAllShared();
-    if(!conectado){ showErrorConexion(); return; }
-    S.torneoId=(await getJSON("torneoId",true))||TOURNAMENT_DEFAULT; // grupos anteriores a este catálogo (ej. JorgeLozano) caen al torneo por defecto
+
+    // estado-grupo trae en una sola llamada todo lo específico de este
+    // grupo (antes eran ~10 getJSON(...,true) leyendo de una CACHE
+    // poblada por fetchAllShared/getAll) -- ver Code.gs → Supabase,
+    // subtarea 09a.
+    const r=await edgeCall("estado-grupo",{});
+    if(!r||r.status!=="success"){ showErrorConexion(); return; }
+    if(!r.group){ showGrupoNoEncontrado(); return; }
+
+    S.groupName=r.group.name;
+    S.torneoId=r.group.torneoId||TOURNAMENT_DEFAULT;
+    S.modoSeguimiento=r.group.modoSeguimiento||"torneo";
+    S.equiposSeguidos=r.group.equiposSeguidos||[];
+    S.betting=r.group.betting||{inscripcion:0,premios:{p1:0,p2:0,p3:0}};
+    S.teamOverrides=r.group.teamOverrides||{};
+    S.roster=r.roster||[];
+    S.custom=(r.customMatches||[]).map(c=>({id:c.id,g:c.fase||"Extra",home:c.home,away:c.away,kick:c.kickoff?new Date(c.kickoff).getTime():null,venue:c.venue||"Estadio Asignado"}));
+
     await activarTorneo(S.torneoId);
-    S.modoSeguimiento=(await getJSON("modoSeguimiento",true))||"torneo";
-    S.equiposSeguidos=(await getJSON("equiposSeguidos",true))||[];
-    S.results=(await getJSON("results",true))||{};
-    S.custom=(await getJSON("custom",true))||[];
-    S.roster=(await getJSON("roster",true))||[];
-    S.groupName=await getJSON("groupName",true);
-    S.teamOverrides=(await getJSON("teamOverrides",true))||{};
-    S.live=(await getJSON("live",true))||{};
-    S.betting=(await getJSON("betting",true))||{inscripcion:0,premios:{p1:0,p2:0,p3:0}};
+
+    // Resultados oficiales (compartidos por torneo) + resultados de
+    // partidos personalizados (ya vienen embebidos en customMatches,
+    // porque esos sí son propios de este grupo) -- se combinan en un
+    // solo S.results, misma forma que antes para no tocar el resto del
+    // código de renderizado/puntajes.
+    const{results:resultsOficiales,live:liveOficial}=await cargarResultadosDelTorneo(S.torneoId);
+    const resultsPersonalizados={};
+    (r.customMatches||[]).forEach(c=>{
+      if(c.homeScore!=null&&c.awayScore!=null)resultsPersonalizados[c.id]={h:String(c.homeScore),a:String(c.awayScore)};
+    });
+    S.results=Object.assign({},resultsOficiales,resultsPersonalizados);
+    S.live=liveOficial;
+
+    // predictions ya viene con TODOS los jugadores del grupo en una sola
+    // respuesta -- antes hacía falta un getJSON("preds_"+id,true) por
+    // cada jugador del roster.
+    S.allPreds={};
+    for(const pid in(r.predictions||{})){
+      const preds={};
+      for(const mid in r.predictions[pid]){
+        const p=r.predictions[pid][mid];
+        preds[mid]={h:p.h!=null?String(p.h):null,a:p.a!=null?String(p.a):null};
+      }
+      S.allPreds[pid]=preds;
+    }
     if(S.me){
-      S.predsMe=(await getJSON("preds_"+S.me.id,true))||{};
+      S.predsMe=S.allPreds[S.me.id]||{};
       const yaEnRoster=S.roster.some(p=>p.id===S.me.id&&p.name===S.me.name&&p.ico===S.me.ico);
       if(!yaEnRoster)await joinRoster();
     }
-    for(const pl of S.roster)S.allPreds[pl.id]=(await getJSON("preds_"+pl.id,true))||{};
-    if(S.me)S.allPreds[S.me.id]=Object.assign({},S.predsMe);
-    
-    if(!S.groupName){
-      showGrupoNoEncontrado();
-      return;
-    }
-    
+
     renderShell();renderView();
     if(!S.me)showOnboarding(false);
     // Sesiones que quedaron activas antes de este cambio de seguridad tienen
