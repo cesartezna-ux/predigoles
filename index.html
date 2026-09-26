@@ -851,23 +851,34 @@ async function savePreds(){
     if(lbl)lbl.textContent=mensajes[mi];
   },2200);
 
-  const ok=await setJSONPlayerAuth("preds_"+S.me.id,S.predsMe);
-  if(ok){
+  // Cada pronóstico es su propia fila en Supabase (a diferencia del blob
+  // único de antes), así que se guarda uno por uno en paralelo -- si algún
+  // partido falla, el resto igual queda guardado y solo ese sigue "sucio".
+  const idsToSave=[...S.dirty];
+  const resultados=await Promise.all(idsToSave.map(async id=>{
+    const p=S.predsMe[id]||{};
+    const r=await edgeCall("guardar-pronostico",{playerId:S.me.id,matchId:id,homeScore:p.h,awayScore:p.a,pin:S.mePinHash});
+    return{id,ok:r&&r.status==="success"};
+  }));
+  const okIds=resultados.filter(x=>x.ok).map(x=>x.id);
+  if(okIds.length>0){
     // Solo llamamos a joinRoster si de verdad hace falta (registro nuevo o
     // cambió nombre/avatar) — chequeo local, sin viaje de red, así que no
     // cuesta nada hacerlo siempre, pero evita el segundo POST innecesario.
     const yaEnRoster=S.roster.some(p=>p.id===S.me.id&&p.name===S.me.name&&p.ico===S.me.ico);
     if(!yaEnRoster)await joinRoster();
     S.allPreds[S.me.id]=Object.assign({},S.predsMe);
-    S.dirty.clear(); // solo se limpia si el guardado fue confirmado de verdad
   }
+  for(const id of okIds)S.dirty.delete(id); // solo se limpia lo que el servidor confirmó
 
   clearInterval(msgInterval);
   S.savingPreds=false;
   updateSaveBar();allMatches().forEach(m=>paintFoot(m));paintMyStats();paintPendingBanner();
-  if(!ok)toast("❌ No se pudo guardar. Revisa tu conexión y vuelve a intentar.",true,5000);
-  else if(dropped>0)toast(`✅ ${cantidadEnEstaAccion} actualizado${cantidadEnEstaAccion===1?"":"s"}. ${dropped} ya cerrado${dropped===1?"":"s"}, no se envió.`,false,5500);
-  else toast(`✅ ${cantidadEnEstaAccion} pronóstico${cantidadEnEstaAccion===1?"":"s"} actualizado${cantidadEnEstaAccion===1?"":"s"}`,false,4000);
+  const fallidos=idsToSave.length-okIds.length;
+  if(okIds.length===0)toast("❌ No se pudo guardar. Revisa tu conexión y vuelve a intentar.",true,5000);
+  else if(fallidos>0)toast(`⚠️ ${okIds.length} guardado${okIds.length===1?"":"s"}, ${fallidos} falló${fallidos===1?"":"aron"}. Intenta de nuevo con el resto.`,true,5500);
+  else if(dropped>0)toast(`✅ ${okIds.length} actualizado${okIds.length===1?"":"s"}. ${dropped} ya cerrado${dropped===1?"":"s"}, no se envió.`,false,5500);
+  else toast(`✅ ${okIds.length} pronóstico${okIds.length===1?"":"s"} actualizado${okIds.length===1?"":"s"}`,false,4000);
 }
 
 /* --- En Vivo --- */
@@ -971,15 +982,14 @@ async function showGroupEdit(){
       if(p1!==p2){err.textContent="Los PIN no coinciden.";return;}
     }
     await conCargando(document.getElementById("ge_save"),async()=>{
-      if(p1){
-        const nuevoHash=_hashPin(p1);
-        const okPin=await setRawAuth("adminPin",nuevoHash);
-        if(!okPin){err.textContent="No se pudo actualizar el PIN.";return;}
-        S.organizerPinHash=nuevoHash;
-        localStorage.setItem("pg_pinhash_"+TAB,nuevoHash);
+      // Una sola petición atómica (nombre + PIN opcional) en vez de dos
+      // seguidas -- evita que un hipo de red deje el grupo a medias.
+      const r=await edgeCall("guardar-config-grupo",{pin:S.organizerPinHash,nombreGrupo:name,pinNuevo:p1||undefined});
+      if(!r||r.status!=="success"){err.textContent=(r&&r.message)||"No se pudo actualizar el grupo.";return;}
+      if(r.nuevoPinHash){
+        S.organizerPinHash=r.nuevoPinHash;
+        localStorage.setItem("pg_pinhash_"+TAB,r.nuevoPinHash);
       }
-      const okName=await setJSONAuth("groupName",name);
-      if(!okName){err.textContent="No se pudo actualizar el nombre del grupo.";return;}
       S.groupName=name;
       ov.remove();renderShell();renderView();
       toast("Grupo actualizado ✓",false,3000);
@@ -1025,15 +1035,13 @@ function showModoSeguimiento(){
     await conCargando(document.getElementById("ms_save"),async()=>{
       // Una sola petición autenticada en vez de dos seguidas (modo +
       // equipos por separado): menos superficie para que un hipo transitorio
-      // de Apps Script tumbe el guardado, y no puede quedar a medias.
-      const r=await cloudCall({action:"guardarSeguimiento",modoSeguimiento:modo,equiposSeguidos:equipos,pin:S.organizerPinHash});
+      // tumbe el guardado, y no puede quedar a medias.
+      const r=await edgeCall("guardar-seguimiento",{modoSeguimiento:modo,equiposSeguidos:equipos,pin:S.organizerPinHash});
       if(!r||r.status!=="success"){
         err.textContent=(r&&r.message)||"No se pudo conectar con el servidor. Intenta de nuevo.";
         return;
       }
       S.modoSeguimiento=modo;S.equiposSeguidos=equipos;
-      CACHE["modoSeguimiento"]=JSON.stringify(modo);
-      CACHE["equiposSeguidos"]=JSON.stringify(equipos);
       ov.remove();renderShell();renderView();
       toast("Modo de seguimiento actualizado ✓",false,3000);
     },"Guardando...");
@@ -1064,8 +1072,8 @@ function editTeamName(id,side,current){
     await conCargando(document.getElementById("popup_save_team"),async()=>{
       S.teamOverrides[id]=S.teamOverrides[id]||{};
       S.teamOverrides[id][side]=name;
-      const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
-      if(!ok)return;
+      const r=await edgeCall("guardar-ajuste-partido",{pin:S.organizerPinHash,matchId:id,[side]:name});
+      if(!r||r.status!=="success")return;
       ov.remove();
       toast("Equipo actualizado ✓",false,2500);
       renderResultados(document.getElementById("content"));
@@ -1103,8 +1111,8 @@ function editMatchSchedule(id,currentKick,currentVenue){
     await conCargando(document.getElementById("ems_clear"),async()=>{
       S.teamOverrides[id]=S.teamOverrides[id]||{};
       S.teamOverrides[id].kick=null;
-      const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
-      if(!ok)return;
+      const r=await edgeCall("guardar-ajuste-partido",{pin:S.organizerPinHash,matchId:id,kick:null});
+      if(!r||r.status!=="success")return;
       ov.remove();
       toast("Partido movido a \"Por confirmar\" ✓",false,3000);
       if(S.view==="resultados")renderResultados(document.getElementById("content"));
@@ -1120,10 +1128,11 @@ function editMatchSchedule(id,currentKick,currentVenue){
     }
     await conCargando(document.getElementById("ems_save"),async()=>{
       S.teamOverrides[id]=S.teamOverrides[id]||{};
-      if(val)S.teamOverrides[id].kick=new Date(val+":00-05:00").getTime();
-      if(venue)S.teamOverrides[id].venue=venue;
-      const ok=await setJSONAuth("teamOverrides",S.teamOverrides);
-      if(!ok)return;
+      const payload={pin:S.organizerPinHash,matchId:id};
+      if(val){const kick=new Date(val+":00-05:00").getTime();S.teamOverrides[id].kick=kick;payload.kick=kick;}
+      if(venue){S.teamOverrides[id].venue=venue;payload.venue=venue;}
+      const r=await edgeCall("guardar-ajuste-partido",payload);
+      if(!r||r.status!=="success")return;
       ov.remove();
       toast("Partido actualizado ✓",false,3000);
       if(S.view==="resultados")renderResultados(document.getElementById("content"));
@@ -1177,8 +1186,8 @@ function showBettingConfig(){
     if(insc<0||p1<0||p2<0||p3<0){err.textContent="Valores no válidos.";return;}
     await conCargando(document.getElementById("bc_save"),async()=>{
       S.betting={inscripcion:insc,premios:{p1,p2,p3}};
-      const ok=await setJSONAuth("betting",S.betting);
-      if(!ok)return;
+      const r=await edgeCall("guardar-premios",{pin:S.organizerPinHash,inscripcion:insc,premios:{p1,p2,p3}});
+      if(!r||r.status!=="success")return;
       ov.remove();
       toast("Premios actualizados ✓",false,3000);
       if(S.view==="ranking")renderRanking(document.getElementById("content"));
@@ -1208,13 +1217,24 @@ function renderResultados(c){
     const tieneResultado=!!S.results[m.id];
     const cuandoLabel=sinFecha?`<span style="color:var(--flare)">📋 Sin fecha confirmada</span>`:`${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}`;
     const btnFecha=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`;
+    // Los resultados de partidos OFICIALES solo llegan por sincronización
+    // automática (fixture_results, vía API) -- el organizador ya no puede
+    // corregirlos a mano, para que ningún grupo se desvíe del marcador real
+    // compartido entre todos. Los personalizados (custom_matches) siguen
+    // siendo manuales porque por definición no existen en ninguna API.
+    const scoreHome=m.custom
+      ?`<input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}">`
+      :`<span class="box" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">${r.h!=null?r.h:"–"}</span>`;
+    const scoreAway=m.custom
+      ?`<input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}">`
+      :`<span class="box" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">${r.a!=null?r.a:"–"}</span>`;
     html+=`<div class="match" style="border-radius:14px">
       <div class="mtop"><span class="grp">🏆 ${m.g}</span>
       <span class="when">${cuandoLabel} ${btnFecha}</span></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}</div>
-      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button><input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}${m.custom?"":" · resultado sincronizado automáticamente"}</div>
+      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>${scoreHome}</div>
       <div class="divider"></div>
-      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span><button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button><input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}"></div>
+      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span><button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>${scoreAway}</div>
     </div>`;
   }
   c.innerHTML=html;
@@ -1224,6 +1244,7 @@ function renderResultados(c){
     b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
   });
   for(const m of ms){
+    if(!m.custom)continue; // solo los personalizados tienen inputs editables
     const rh=document.getElementById("rh_"+m.id),ra=document.getElementById("ra_"+m.id);
     if(!rh||!ra)continue;
     const on=()=>{
@@ -1237,13 +1258,25 @@ function renderResultados(c){
   updateSaveBar();
 }
 async function saveResultsBatch(){
+  // S.resDirty solo puede contener partidos personalizados (los oficiales ya
+  // no tienen input editable), así que cada uno se guarda por separado vía
+  // guardar-resultado-personalizado -- nunca se toca fixture_results desde acá.
   const btn=document.getElementById("saveResBtn");
   await conCargando(btn,async()=>{
-    S.results=Object.assign({},S.resWork);
-    Object.keys(S.results).forEach(k=>{const r=S.results[k];if(!r||r.h==null||r.a==null)delete S.results[k];});
-    const ok=await setJSONAuth("results",S.results);
-    S.resDirty.clear();updateSaveBar();
-    toast(ok?"Resultados guardados ✓":"Error al guardar",!ok);
+    const ids=[...S.resDirty];
+    const resultados=await Promise.all(ids.map(async id=>{
+      const r=S.resWork[id]||{};
+      const resp=await edgeCall("guardar-resultado-personalizado",{matchId:id,homeScore:r.h,awayScore:r.a,pin:S.organizerPinHash});
+      return{id,ok:resp&&resp.status==="success"};
+    }));
+    const okIds=resultados.filter(x=>x.ok).map(x=>x.id);
+    for(const id of okIds){
+      if(S.resWork[id]!=null)S.results[id]=S.resWork[id];else delete S.results[id];
+    }
+    for(const id of okIds)S.resDirty.delete(id);
+    updateSaveBar();
+    const fallidos=resultados.length-okIds.length;
+    toast(fallidos===0?"Resultados guardados ✓":`${okIds.length} guardado(s), ${fallidos} falló(aron)`,fallidos>0);
     if(S.view==="ranking")renderRanking(document.getElementById("content"));
   },"Guardando...");
 }
