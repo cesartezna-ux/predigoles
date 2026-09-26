@@ -1154,13 +1154,19 @@ function renderResultados(c){
     const tieneResultado=!!S.results[m.id];
     const cuandoLabel=sinFecha?`<span style="color:var(--flare)">📋 Sin fecha confirmada</span>`:`${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}`;
     const btnFecha=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`;
+    // El botón de "editar nombre" es para llaves de eliminación con equipo
+    // aún por definir (ej. "Ganador Grupo A") -- una vez el partido ya tiene
+    // resultado, los equipos ya son un hecho histórico y no deben poder
+    // reetiquetarse (misma guardia que ya tenía btnFecha arriba).
+    const btnEditHome=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>`;
+    const btnEditAway=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>`;
     html+=`<div class="match" style="border-radius:14px">
       <div class="mtop"><span class="grp">🏆 ${m.g}</span>
       <span class="when">${cuandoLabel} ${btnFecha}</span></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}</div>
-      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span><button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button><input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}"></div>
+      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span>${btnEditHome}<input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}"></div>
       <div class="divider"></div>
-      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span><button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button><input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}"></div>
+      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span>${btnEditAway}<input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}"></div>
     </div>`;
   }
   c.innerHTML=html;
