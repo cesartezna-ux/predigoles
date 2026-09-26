@@ -34,6 +34,30 @@ export async function checkAdminAuth(
   return null;
 }
 
+// Traducción de checkMasterAuth() en Code.gs. El PIN maestro NUNCA vive
+// en una tabla -- solo en el secreto MASTER_PIN_HASH del proyecto de
+// Supabase (equivalente a PropertiesService en Apps Script), configurado
+// con `supabase secrets set MASTER_PIN_HASH=<hash>`.
+export async function checkMasterAuth(
+  db: SupabaseClient,
+  pinEnviado: string | null | undefined,
+): Promise<RespuestaError | null> {
+  const identidad = "master";
+  const bloqueo = await rateLimitCheck(db, identidad);
+  if (bloqueo) return bloqueo;
+
+  const masterPinHash = Deno.env.get("MASTER_PIN_HASH") || "";
+  if (!masterPinHash) {
+    return { status: "error", message: "PIN maestro no configurado en el servidor todavía." };
+  }
+  if (!pinEnviado || pinEnviado !== masterPinHash) {
+    await rateLimitRegistrarFallo(db, identidad);
+    return { status: "error", message: "PIN maestro inválido." };
+  }
+  await rateLimitRegistrarExito(db, identidad);
+  return null;
+}
+
 export async function checkPlayerAuth(
   db: SupabaseClient,
   groupId: string,
