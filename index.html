@@ -475,16 +475,15 @@ function cd(diff){
   return{t:`${mm}m ${String(s).padStart(2,"0")}s`,soon:true};
 }
 
-/* El pronóstico cierra a las 11:59:59pm (hora Colombia) del día ANTERIOR al
-   partido — no a la hora exacta del pitazo inicial. El truco de restar/sumar
-   5h es el mismo que usamos para el editor de fecha: nos deja calcular sobre
-   los dígitos de la hora de Colombia sin depender de en qué huso horario esté
-   el navegador de quien está mirando la app. */
+/* El pronóstico cierra 1 minuto antes del pitazo inicial. Antes cerraba a
+   las 11:59 p.m. del día ANTERIOR al partido -- ese margen amplio existía
+   porque la fecha/hora del partido no se refrescaba sola (podía quedar
+   desactualizada). Ya no aplica: sincronizar-resultados mantiene kickoff
+   al día cada 10 min (ver "Torneos y calendario" en CLAUDE.md), así que el
+   epoch que llega aquí ya es confiable y no hace falta el colchón. */
 function calcularLimite(kickEpoch){
   if(kickEpoch==null)return null;
-  const d=new Date(kickEpoch-5*60*60*1000);
-  const limite=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-1,23,59,59,999));
-  return limite.getTime()+5*60*60*1000;
+  return kickEpoch-60*1000;
 }
 
 function _hashPin(pin){let h=0;for(let i=0;i<pin.length;i++){h=((h<<5)-h)+pin.charCodeAt(i);h|=0;}return"ph_"+Math.abs(h).toString(36);}
@@ -716,7 +715,7 @@ function renderPartidos(c){
   html+=`<div class="rules"><div><b>Cómo se ganan los puntos</b></div>
     <div style="margin-top:8px"><span class="pill">+1</span> si aciertas quién gana (o el empate).</div>
     <div><span class="pill">+2</span> extra si además clavas el marcador exacto. <span style="color:var(--muted)">(máximo <b style="color:var(--gold)">3</b> por partido)</span></div>
-    <div style="margin-top:8px">Cada partido cierra a las 11:59 p.m. del día ANTERIOR al partido — no a la hora exacta del pitazo. Los partidos "por confirmar" quedan abiertos hasta que el organizador defina su fecha.</div></div>`;
+    <div style="margin-top:8px">Cada partido cierra 1 minuto antes del pitazo inicial. Los partidos "por confirmar" quedan abiertos hasta que se confirme su fecha.</div></div>`;
   c.innerHTML=html;
 
   matchesById={};allMatches().forEach(x=>matchesById[x.id]=x);
