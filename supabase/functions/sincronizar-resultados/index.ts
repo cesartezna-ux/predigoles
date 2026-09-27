@@ -15,9 +15,16 @@
 // que siempre viene de cargarFixtureDesdeAPI". Todo fixture cargado por
 // esta vía siempre trae "af_<id>", así que ese camino era código muerto
 // en la práctica; si algún día se necesita, se puede reintroducir.
+//
+// Además de marcadores, cada corrida también refresca equipos/fecha/sede
+// en `fixtures` con lo que ya trae esta misma respuesta de la API (sin
+// llamada extra) -- es la única vía para actualizar esos datos de un
+// partido oficial; el admin no puede editarlos a mano (ver
+// guardar-ajuste-partido, que solo aplica a partidos personalizados).
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { TORNEOS_SYNC } from "../_shared/torneosSync.ts";
+import { traducirEquipo } from "../_shared/teamDict.ts";
 
 const APIFOOTBALL_BASE = "https://v3.football.api-sports.io";
 // Estados de api-football.com: NS (no iniciado), 1H/HT/2H/ET/BT/P (en
@@ -43,7 +50,7 @@ async function sincronizarTorneo(
 ) {
   const { data: fixtureRows } = await db
     .from("fixtures")
-    .select("match_id, home, away")
+    .select("match_id, home, away, fase")
     .eq("torneo_id", torneoId);
   const fixtureActual = fixtureRows ?? [];
   if (!fixtureActual.length) {
@@ -77,16 +84,39 @@ async function sincronizarTorneo(
 
   const ahoraISO = new Date().toISOString();
   const upserts: Record<string, unknown>[] = [];
+  const fixtureUpdates: Record<string, unknown>[] = [];
   const aLimpiar: string[] = [];
   const sinMapear: string[] = [];
 
   for (const m of fixtureActual) {
-    if (esPlaceholder(m.home, m.away)) continue;
     const apiId = idAPIFootball(m.match_id);
     if (apiId == null) {
       sinMapear.push(`${m.home} vs ${m.away} (id ${m.match_id}, formato de id inesperado)`);
       continue;
     }
+
+    // Refresca equipos/fecha/sede con lo que ya trae esta misma respuesta de
+    // la API (sin llamada extra) -- el calendario de un partido oficial se
+    // actualiza SOLO por esta vía, nunca a mano (ver guardar-ajuste-partido).
+    // Esto resuelve solo, con el tiempo, una llave de eliminación tipo
+    // "Ganador Grupo A" en cuanto la API confirme el equipo real, y una
+    // fecha "TBD" en cuanto la liga la confirme.
+    const apiMatch = idxIdTodos.get(apiId);
+    if (apiMatch) {
+      fixtureUpdates.push({
+        torneo_id: torneoId,
+        match_id: m.match_id,
+        fase: m.fase,
+        home: traducirEquipo(apiMatch.teams.home.name),
+        away: traducirEquipo(apiMatch.teams.away.name),
+        kickoff: apiMatch.fixture.status.short === "TBD" ? null : apiMatch.fixture.date,
+        venue: apiMatch.fixture.venue?.name
+          ? apiMatch.fixture.venue.name + (apiMatch.fixture.venue.city ? `, ${apiMatch.fixture.venue.city}` : "")
+          : "Estadio por confirmar",
+      });
+    }
+
+    if (esPlaceholder(m.home, m.away)) continue;
 
     const pFin = idxIdFinished.get(apiId);
     if (pFin) {
@@ -119,6 +149,13 @@ async function sincronizarTorneo(
     const { error } = await db.from("fixture_results").upsert(upserts, { onConflict: "torneo_id,match_id" });
     if (error) {
       return { error: `Error guardando resultados: ${error.message}`, sincronizados: 0, enVivo: 0, limpiados: 0, total: fixtureActual.length, sinMapear };
+    }
+  }
+
+  if (fixtureUpdates.length) {
+    const { error } = await db.from("fixtures").upsert(fixtureUpdates, { onConflict: "torneo_id,match_id" });
+    if (error) {
+      return { error: `Error refrescando calendario: ${error.message}`, sincronizados: 0, enVivo: 0, limpiados: 0, total: fixtureActual.length, sinMapear };
     }
   }
 

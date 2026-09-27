@@ -1,9 +1,14 @@
 // Equivalente de guardar "teamOverrides" en Code.gs (editTeamName() /
-// editMatchSchedule()) -- un ajuste por partido, específico de ESTE
-// grupo: nombre de equipo (home/away) y/o fecha-hora-sede (kick/venue).
-// Aplica tanto a partidos oficiales (compartidos entre grupos en
-// fixtures) como a los personalizados -- el ajuste vive en el grupo, así
-// que nunca se filtra a otro grupo que siga el mismo torneo.
+// editMatchSchedule()) -- un ajuste por partido: nombre de equipo
+// (home/away) y/o fecha-hora-sede (kick/venue). Ambos son EXCLUSIVOS de
+// partidos personalizados (custom_matches): la API ya provee TODOS los
+// partidos de un torneo, incluidas las fases eliminatorias, y los
+// mantiene al día sola (ver sincronizar-resultados, que además de
+// marcadores refresca equipos/fecha/sede cada corrida) -- el admin
+// nunca debe poder tocar a mano ningún dato de un partido oficial.
+// Esta validación se hace aquí (no solo ocultando los botones en el
+// frontend) porque el cliente nunca es confiable: un llamado directo a
+// la API podría saltarse esa regla si solo viviera en la UI.
 //
 // Solo se tocan los campos que vienen en la petición ("home" in body,
 // etc.) -- así se puede, por ejemplo, borrar la fecha (mandar kick:null
@@ -30,6 +35,18 @@ Deno.serve(async (req: Request) => {
 
     const authError = await checkAdminAuth(db, String(tab), pin ? String(pin) : null);
     if (authError) return jsonOut(authError);
+
+    if ("home" in body || "away" in body || "kick" in body || "venue" in body) {
+      const { data: cm } = await db
+        .from("custom_matches")
+        .select("id")
+        .eq("id", matchId)
+        .eq("group_id", tab)
+        .maybeSingle();
+      if (!cm) {
+        return jsonOut({ status: "error", message: "No se puede editar un partido oficial: sus datos vienen de la API y se sincronizan solos." });
+      }
+    }
 
     const { data: grupo } = await db.from("groups").select("team_overrides").eq("id", tab).maybeSingle();
     if (!grupo) return jsonOut({ status: "error", message: "Grupo no encontrado." });
