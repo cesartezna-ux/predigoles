@@ -910,6 +910,33 @@ function _sincronizarTorneo(torneoId, leagueId, season) {
   const idxFinished = indexarPorNombres(finished);
   const idxEnJuego = indexarPorNombres(enJuego);
 
+  // Refresca equipos/fecha/sede en la malla compartida del torneo con lo que
+  // ya trae esta misma respuesta de la API (sin llamada extra) -- es la
+  // única vía para actualizar esos datos de un partido oficial; el admin no
+  // puede editarlos a mano (editTeamName/editMatchSchedule ahora solo
+  // aplican a partidos personalizados). Resuelve solo, con el tiempo, una
+  // llave de eliminación tipo "Ganador Grupo A" en cuanto la API confirme el
+  // equipo real, y una fecha "TBD" en cuanto la liga la confirme.
+  if (fixtureTab) {
+    const fixtureRefrescado = fixtureList.map(function (row) {
+      const apiId = idAPIFootball(row[0]);
+      if (apiId == null) return row;
+      const m = idxIdTodos[apiId];
+      if (!m) return row;
+      const kick = m.fixture.status.short === "TBD" ? "" : m.fixture.date;
+      const venue = (m.fixture.venue && m.fixture.venue.name)
+        ? m.fixture.venue.name + (m.fixture.venue.city ? ", " + m.fixture.venue.city : "")
+        : "Estadio por confirmar";
+      return [row[0], row[1], kick, traducirEquipo(m.teams.home.name), traducirEquipo(m.teams.away.name), venue];
+    });
+    const jsonRefrescado = JSON.stringify(fixtureRefrescado);
+    if (jsonRefrescado.length <= LIMITE_CARACTERES_CELDA) {
+      setKey(fixtureTab, "partidos", jsonRefrescado);
+    } else {
+      Logger.log("No se refrescó el calendario de \"" + torneoId + "\": el JSON supera el límite de " + LIMITE_CARACTERES_CELDA + " caracteres por celda de Sheets.");
+    }
+  }
+
   const syncedResults = {};
   const syncedLive = {};
   const sinMapear = [];
