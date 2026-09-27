@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- GitHub Pages es hosting estático puro (sin reglas de servidor), así que
+     una URL fija como predigoles.com/home necesita un archivo real en esta
+     ruta. Este archivo solo redirige a la landing informativa (?home=1
+     fuerza que se muestre siempre, aunque el navegador ya tenga un grupo
+     guardado) -- la landing en sí vive en el index.html real, no aquí, para
+     no duplicar el diseño/CSS en dos archivos que se puedan desincronizar. -->
+<meta http-equiv="refresh" content="0; url=/?home=1">
+<script>location.replace("/?home=1");</script>
+<title>Predigoles</title>
+</head>
+<body></body>
+</html>

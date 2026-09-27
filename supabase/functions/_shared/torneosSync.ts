@@ -7,4 +7,5 @@ export const TORNEOS_SYNC: Record<string, { leagueId: number; season: number }> 
   champions_2026_27: { leagueId: 2, season: 2026 },
   liga_mx_2026: { leagueId: 262, season: 2026 }, // Apertura 2026 -- este season ya viene acotado, sin Clausura mezclada
   liga_argentina_2026: { leagueId: 128, season: 2026 }, // Apertura+Clausura juntos -- cargar-fixture ya filtró solo Clausura (fase en curso)
+  nations_league_2026_27: { leagueId: 5, season: 2026 }, // UEFA Nations League, arrancó 24/09/2026
 };

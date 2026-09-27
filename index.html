@@ -216,6 +216,13 @@ const REST_URL=SUPABASE_URL+"/rest/v1";
 /* --- Multi-tenant con soporte para ?grupo= o ?tab= --- */
 const _qp=new URLSearchParams(location.search);
 const ES_PANEL_CENTRAL=_qp.get("admin")==="central";
+// Landing informativa: visita "en blanco" a predigoles.com, sin ?grupo=/?tab=
+// ni un grupo recordado de una visita anterior -- antes esto caía al grupo
+// por defecto ("fpc2026", que no existe) y mostraba "grupo no encontrado".
+// Ningún link existente (predigoles.com/?grupo=<id>) se ve afectado.
+// ?home=1 la fuerza siempre (la usa /home/, para tener una URL fija que
+// muestre la landing aunque el navegador ya tenga un grupo guardado).
+const ES_LANDING=!ES_PANEL_CENTRAL && (_qp.get("home")==="1" || (!_qp.get("grupo") && !_qp.get("tab") && !localStorage.getItem("pg_tab")));
 const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"fpc2026").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"fpc2026";
 localStorage.setItem("pg_tab",TAB);
 
@@ -348,6 +355,31 @@ const TOURNAMENTS={
       "Racing Club":"⚽","River Plate":"⚽","Rosario Central":"⚽","San Lorenzo":"⚽",
       "Sarmiento Junin":"⚽","Talleres Cordoba":"⚽","Tigre":"⚽","Union Santa Fe":"⚽",
       "Velez Sarsfield":"⚽"
+    },
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[]
+  },
+  "nations_league_2026_27":{
+    nombre:"UEFA Nations League 2026-27",
+    kicker:"Nations League · Selecciones",
+    h1a:"Rumbo a la ",h1b:"Final",
+    subtitulo:"Acierta el resultado y clava el marcador entre selecciones de Europa.",
+    // Nombres tomados directo de api-football (liga 5, temporada 2026 --
+    // arrancó el 24/09/2026, en curso). Las 54 selecciones de las 4 ligas
+    // (A/B/C/D); todavía no hay fase final fixturada (llega meses después),
+    // así que no hace falta EXTRA_ALLOWED por ahora.
+    FLAG:{
+      "Albania":"⚽","Andorra":"⚽","Armenia":"⚽","Austria":"⚽","Azerbaijan":"⚽",
+      "Belarus":"⚽","Belgium":"⚽","Bosnia & Herzegovina":"⚽","Bulgaria":"⚽",
+      "Croatia":"⚽","Cyprus":"⚽","Czechia":"⚽","Denmark":"⚽","England":"⚽",
+      "Estonia":"⚽","FYR Macedonia":"⚽","Faroe Islands":"⚽","Finland":"⚽",
+      "France":"⚽","Georgia":"⚽","Germany":"⚽","Gibraltar":"⚽","Greece":"⚽",
+      "Hungary":"⚽","Iceland":"⚽","Israel":"⚽","Italy":"⚽","Kazakhstan":"⚽",
+      "Kosovo":"⚽","Latvia":"⚽","Liechtenstein":"⚽","Lithuania":"⚽","Luxembourg":"⚽",
+      "Malta":"⚽","Moldova":"⚽","Montenegro":"⚽","Netherlands":"⚽","Northern Ireland":"⚽",
+      "Norway":"⚽","Poland":"⚽","Portugal":"⚽","Rep. Of Ireland":"⚽","Romania":"⚽",
+      "San Marino":"⚽","Scotland":"⚽","Serbia":"⚽","Slovakia":"⚽","Slovenia":"⚽",
+      "Spain":"⚽","Sweden":"⚽","Switzerland":"⚽","Türkiye":"⚽","Ukraine":"⚽","Wales":"⚽"
     },
     ESCUDOS:{},
     EXTRA_ALLOWED:[]
@@ -1171,6 +1203,41 @@ function renderResultados(c){
   document.getElementById("rs_pinjugador").onclick=showPinReset;
 }
 /* --- Setup inicial --- */
+/* --- Landing informativa (predigoles.com sin ?grupo=) ---
+   Reemplaza todo el shell de #root (no es un overlay: no hay nada de app
+   debajo que preservar). Mismo copy que la ficha de Gumroad, para que la
+   promesa sea consistente entre dónde se compra y dónde se explica. */
+function renderLanding(){
+  const root=document.getElementById("root");
+  root.innerHTML=`
+    <div class="kicker">PREDIGOLES</div>
+    <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
+    <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
+
+    <a class="btn" href="https://cesartez.gumroad.com/l/Predigoles" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+
+    <div class="rules" style="margin-top:22px">
+      <div><b>⚡ Resultados en tiempo real</b> — los marcadores se sincronizan solos, nadie los digita a mano.</div>
+      <div style="margin-top:10px"><b>🎮 Interfaz estilo videojuego</b> — diseño oscuro, rápido y pensado para el celular.</div>
+      <div style="margin-top:10px"><b>🏆 Elige tu liga</b> — Liga BetPlay (Colombia), La Liga (España), Champions League, Liga MX (México) y Liga Profesional (Argentina).</div>
+      <div style="margin-top:10px"><b>🔒 Privado por diseño</b> — cada grupo tiene su propio link y PIN, nadie de otro grupo ve tus datos.</div>
+      <div style="margin-top:10px"><b>💬 100% informativo</b> — Predigoles no recauda ni administra dinero; cada quien le paga directo al ganador.</div>
+    </div>
+
+    <div class="addbox" style="margin-top:22px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿Ya tienes un grupo? Escribe su ID para entrar directo:</div>
+      <input class="input" id="landing_grupo_id" placeholder="ej: miempresa2026" style="margin-bottom:10px">
+      <button class="smallbtn full" id="landing_ir">Entrar a mi grupo</button>
+    </div>
+  `;
+  const irAlGrupo=()=>{
+    const id=document.getElementById("landing_grupo_id").value.trim();
+    if(id)location.href="/?grupo="+encodeURIComponent(id);
+  };
+  document.getElementById("landing_ir").onclick=irAlGrupo;
+  document.getElementById("landing_grupo_id").onkeydown=e=>{if(e.key==="Enter")irAlGrupo();};
+}
+
 function showGrupoNoEncontrado(){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
@@ -1691,6 +1758,7 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
 /* --- Boot --- */
 (async function boot(){
   if(ES_PANEL_CENTRAL){ bootPanelCentral(); return; }
+  if(ES_LANDING){ renderLanding(); return; }
   try{
     S.allPreds={};
     S.me=await getJSON("me");
