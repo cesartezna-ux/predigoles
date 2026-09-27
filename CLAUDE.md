@@ -97,6 +97,7 @@ Dos grupos con datos reales (`jorgelozano`, `Prueba_01`) se migraron a Supabase 
 
 - **Documentación mínima pero real:** cada función/endpoint nuevo lleva un comentario de una línea explicando el *por qué* si no es obvio (no el *qué* — eso ya lo dice el nombre).
 - **Manejo de errores con propósito:** capturas y manejas errores en los puntos donde algo puede fallar de verdad (llamadas a Supabase/APIs externas, parsing de datos, condiciones de carrera en escrituras concurrentes) — no relleno defensivo en cada línea.
+- **CSS de componentes visuales reutilizados, nunca anidado a un solo contexto:** si un mismo elemento (un ícono enmarcado, un botón, una tarjeta) aparece en más de un lugar, su clase se define suelta (`.ico{...}`), no anidada bajo el selector de donde se usó primero (`.row .ico{...}`). Anidarla hace que funcione donde se probó y falle en silencio (sin error, solo se ve distinto) en cualquier otro lugar donde se reutilice la misma clase — así se detectó este bug exacto en el panel de organizador. Antes de reutilizar una clase en un contexto nuevo, confirma que su selector no dependa de un ancestro específico.
 - **Sin sobre-ingeniería:** no agregues validaciones, abstracciones o flags para casos que no pueden ocurrir en este proyecto. Tres líneas repetidas son mejor que una abstracción prematura.
 
 ## Testing y verificación
