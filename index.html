@@ -1264,19 +1264,52 @@ function renderLanding(){
   document.getElementById("landing_grupo_id").onkeydown=e=>{if(e.key==="Enter")irAlGrupo();};
 
   // Ticker "en vivo": honesto, no decorativo -- si no hay ningún partido en
-  // vivo en este momento (lo normal la mayor parte del día), simplemente no
-  // se muestra nada, en vez de simular actividad que no existe.
+  // vivo en este momento (lo normal la mayor parte del día), se muestra el
+  // próximo encuentro en su lugar, priorizando el torneo del país del
+  // visitante (heurística por zona horaria del navegador -- sin pedir
+  // geolocalización ni depender de un servicio externo de terceros).
   (async()=>{
-    const live=await restCall("fixture_results?status=not.is.null&select=torneo_id,match_id,home_score,away_score,minute&order=synced_at.desc&limit=1");
-    if(!live||!live.length)return;
-    const lm=live[0];
-    const fx=await restCall(`fixtures?torneo_id=eq.${encodeURIComponent(lm.torneo_id)}&match_id=eq.${encodeURIComponent(lm.match_id)}&select=home,away`);
-    if(!fx||!fx.length)return;
-    const m=fx[0];
-    const torneoNombre=(TOURNAMENTS[lm.torneo_id]||{}).nombre||lm.torneo_id;
     const el=document.getElementById("landing_live");
-    if(el)el.innerHTML=`<div class="chip" style="margin-top:14px;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4)"><span class="dot" style="background:var(--flare);box-shadow:0 0 10px var(--flare);animation:pulse-live 1s ease-in-out infinite"></span> EN VIVO ${lm.minute!=null?lm.minute+"' · ":""}<b style="color:var(--line);margin-left:4px">${escapeHtml(m.home)} ${lm.home_score}-${lm.away_score} ${escapeHtml(m.away)}</b> · ${escapeHtml(torneoNombre)}</div>`;
+    if(!el)return;
+    const live=await restCall("fixture_results?status=not.is.null&select=torneo_id,match_id,home_score,away_score,minute&order=synced_at.desc&limit=1");
+    if(live&&live.length){
+      const lm=live[0];
+      const fx=await restCall(`fixtures?torneo_id=eq.${encodeURIComponent(lm.torneo_id)}&match_id=eq.${encodeURIComponent(lm.match_id)}&select=home,away`);
+      if(fx&&fx.length){
+        const m=fx[0];
+        const torneoNombre=(TOURNAMENTS[lm.torneo_id]||{}).nombre||lm.torneo_id;
+        el.innerHTML=`<div class="chip" style="margin-top:14px;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4)"><span class="dot" style="background:var(--flare);box-shadow:0 0 10px var(--flare);animation:pulse-live 1s ease-in-out infinite"></span> EN VIVO ${lm.minute!=null?lm.minute+"' · ":""}<b style="color:var(--line);margin-left:4px">${escapeHtml(m.home)} ${lm.home_score}-${lm.away_score} ${escapeHtml(m.away)}</b> · ${escapeHtml(torneoNombre)}</div>`;
+        return;
+      }
+    }
+    const nowIso=new Date().toISOString();
+    const torneoPref=torneoPorZonaHoraria();
+    let next=null;
+    if(torneoPref){
+      const rows=await restCall(`fixtures?torneo_id=eq.${encodeURIComponent(torneoPref)}&kickoff=gt.${encodeURIComponent(nowIso)}&select=torneo_id,home,away,kickoff&order=kickoff.asc&limit=1`);
+      if(rows&&rows.length)next=rows[0];
+    }
+    if(!next){
+      const rows=await restCall(`fixtures?kickoff=gt.${encodeURIComponent(nowIso)}&select=torneo_id,home,away,kickoff&order=kickoff.asc&limit=1`);
+      if(rows&&rows.length)next=rows[0];
+    }
+    if(!next)return;
+    const torneoNombre=(TOURNAMENTS[next.torneo_id]||{}).nombre||next.torneo_id;
+    el.innerHTML=`<div class="chip" style="margin-top:14px">🗓️ Próximo: <b style="color:var(--line);margin-left:4px">${escapeHtml(next.home)} vs ${escapeHtml(next.away)}</b> · ${fmtFechaCorta(next.kickoff)} · ${FT.format(new Date(next.kickoff))} · ${escapeHtml(torneoNombre)}</div>`;
   })();
+}
+
+// Heurística de país por zona horaria del navegador -- ninguna liga ata a
+// Champions/Nations League a un solo país, así que esas quedan fuera del
+// mapa y solo entran por el fallback global (el próximo partido de
+// cualquier torneo, sin importar el país).
+function torneoPorZonaHoraria(){
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";
+  if(tz==="America/Bogota")return"fpc_2026_2";
+  if(tz==="Europe/Madrid")return"la_liga_2026_27";
+  if(tz.startsWith("America/Argentina"))return"liga_argentina_2026";
+  if(tz.startsWith("America/")&&/Mexico_City|Cancun|Merida|Monterrey|Tijuana|Chihuahua|Hermosillo|Matamoros|Bahia_Banderas/.test(tz))return"liga_mx_2026";
+  return null;
 }
 
 function showGrupoNoEncontrado(){
