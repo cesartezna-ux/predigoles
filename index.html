@@ -621,6 +621,7 @@ function renderShell(){
         <div class="tab" data-v="ranking">Ranking</div>
         <div class="tab key ${S.organizer?"on":""}" data-v="resultados" id="orgTab">🔑<span class="tk-label">&nbsp;Organizador</span></div>
       </div>
+      <div id="dateselSlot"></div>
     </div>
     <div id="content"></div>`;
   document.getElementById("changeName").onclick=()=>showOnboarding(true);
@@ -691,6 +692,12 @@ let matchesById={};
 function renderView(){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.v===S.view));
   const c=document.getElementById("content");
+  // El selector de fecha vive en el header fijo (dateselSlot), no dentro de
+  // #content -- solo la pestaña Partidos lo usa, así que se limpia antes de
+  // cada render y renderPartidos() lo vuelve a llenar si aplica. Evita que
+  // quede pegado el selector de la última vez que se vio Partidos.
+  const dsSlot=document.getElementById("dateselSlot");
+  if(dsSlot)dsSlot.innerHTML="";
   matchEls={};
   if(S.view==="partidos")renderPartidos(c);
   else if(S.view==="envivo")renderEnVivo(c);
@@ -781,7 +788,8 @@ function renderPartidos(c){
       chips+=`<div class="datechip ${i===activeIdx?"active":""} ${isToday?"hoy":""}" data-idx="${i}">${isToday?"Hoy · "+d.label:d.label}</div>`;
     });
 
-    html+=`<div class="datesel">
+    const dsSlot=document.getElementById("dateselSlot");
+    if(dsSlot)dsSlot.innerHTML=`<div class="datesel">
       <button class="dayarrow" id="prevDay" ${activeIdx<=0?"disabled":""}>‹</button>
       <div class="datechips" id="datechips">${chips}</div>
       <button class="dayarrow" id="nextDay" ${activeIdx>=days.length-1?"disabled":""}>›</button>
