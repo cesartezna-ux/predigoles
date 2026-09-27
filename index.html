@@ -310,10 +310,51 @@ const TOURNAMENTS={
       "Por definir (Octavos)","Por definir (Cuartos)","Por definir (Semis)",
       "Ganador Octavos","Ganador Cuartos","Ganador Semis"
     ]
+  },
+  "liga_mx_2026":{
+    nombre:"Liga MX Apertura 2026",
+    kicker:"Liga MX · México",
+    h1a:"Rumbo al ",h1b:"Título",
+    subtitulo:"Acierta el resultado y clava el marcador en el fútbol mexicano.",
+    // Nombres tomados directo de api-football (equipos de la Apertura 2026,
+    // liga 262, temporada 2026 -- ese "season" ya viene acotado solo a la
+    // Apertura, sin roundContains). Sin escudos propios todavía, cae al ⚽.
+    FLAG:{
+      "Atlante FC":"⚽","Atlas":"⚽","Atletico San Luis":"⚽","CF Pachuca":"⚽",
+      "Club America":"⚽","Club Queretaro":"⚽","Club Tijuana":"⚽","Cruz Azul":"⚽",
+      "FC Juarez":"⚽","Guadalajara Chivas":"⚽","Leon":"⚽","Monterrey":"⚽",
+      "Necaxa":"⚽","Puebla":"⚽","Santos Laguna":"⚽","Tigres UANL":"⚽",
+      "Toluca":"⚽","U.N.A.M. - Pumas":"⚽"
+    },
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[]
+  },
+  "liga_argentina_2026":{
+    nombre:"Liga Profesional Argentina 2026",
+    kicker:"Liga Profesional · Argentina",
+    h1a:"Rumbo al ",h1b:"Título",
+    subtitulo:"Acierta el resultado y clava el marcador en el fútbol argentino.",
+    // Nombres tomados directo de api-football (equipos de la Liga Profesional,
+    // liga 128, temporada 2026). A diferencia de Liga MX, este "season" trae
+    // Apertura Y Clausura juntos -- se carga con roundContains:"Clausura"
+    // (la fase en curso) para no repetir el error histórico del FPC.
+    FLAG:{
+      "Aldosivi":"⚽","Argentinos JRS":"⚽","Atletico Tucuman":"⚽","Banfield":"⚽",
+      "Barracas Central":"⚽","Belgrano Cordoba":"⚽","Boca Juniors":"⚽",
+      "Central Cordoba de Santiago":"⚽","Defensa Y Justicia":"⚽","Deportivo Riestra":"⚽",
+      "Estudiantes L.P.":"⚽","Estudiantes de Rio Cuarto":"⚽","Gimnasia L.P.":"⚽",
+      "Gimnasia M.":"⚽","Huracan":"⚽","Independ. Rivadavia":"⚽","Independiente":"⚽",
+      "Instituto Cordoba":"⚽","Lanus":"⚽","Newells Old Boys":"⚽","Platense":"⚽",
+      "Racing Club":"⚽","River Plate":"⚽","Rosario Central":"⚽","San Lorenzo":"⚽",
+      "Sarmiento Junin":"⚽","Talleres Cordoba":"⚽","Tigre":"⚽","Union Santa Fe":"⚽",
+      "Velez Sarsfield":"⚽"
+    },
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[]
   }
   // Próximo torneo se agrega como otra entrada aquí, con su propio FLAG/ESCUDOS
-  // — sin tocar nada más del archivo. Su malla se carga igual, vía
-  // cargarFixtureDesdeAPI(torneoId, leagueId, season) en Code.gs.
+  // — sin tocar nada más del archivo. Su malla se carga igual, corriendo la
+  // Edge Function cargar-fixture (torneoId, leagueId, season) en Supabase.
 };
 
 /* --- Estado del torneo activo del grupo, resuelto en boot() a partir de la
