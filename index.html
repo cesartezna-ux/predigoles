@@ -186,7 +186,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwVi6hbGVQKPnesmLkR_KSrvVowdHXk7bi5ldBeqcR0_ELzhhhwBsnLOhUTkUlgZkct/exec";
 // --- Supabase (migración en curso, rama supabase-migration) ---
 // SUPABASE_ANON_KEY es la llave PÚBLICA, diseñada para ir en el cliente --
 // la protección real de los datos la da RLS (negar por defecto salvo
@@ -364,10 +363,10 @@ function crestHtml(archivo,emoji){
 function flag(n){return crestHtml(ESCUDOS[n],FLAG[n]||"⚽");}
 
 /* --- Supabase: Edge Functions + lectura directa (fixtures/resultados/
-   escudos, públicos vía RLS) -- fetch() plano, sin librería, igual de
-   simple que cloudCall(). Todo lo migrado a Supabase pasa por acá; lo que
-   sigue en Apps Script (mientras se completa la reconexión) sigue usando
-   cloudCall()/SCRIPT_URL más abajo, sin tocarse. */
+   escudos, públicos vía RLS) -- fetch() plano, sin librería. Ya no queda
+   nada del puente a Apps Script (cloudCall/SCRIPT_URL): todo el frontend
+   pasa por acá o por localStorage puro (getJSON/setJSON, identidad local
+   del dispositivo). */
 async function edgeCall(fnName,payload){
   try{
     const r=await fetch(`${FUNCTIONS_URL}/${fnName}`,{
@@ -386,59 +385,10 @@ async function restCall(pathAndQuery){
   }catch(e){console.error("restCall error",pathAndQuery,e);return null;}
 }
 
-/* --- Storage --- */
-const CACHE={};
-async function cloudCall(data){
-  if(!SCRIPT_URL||SCRIPT_URL.includes("AQUÍ")) return null;
-  try{const r=await fetch(SCRIPT_URL,{method:"POST",mode:"cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({...data,tab:TAB})});return await r.json();}
-  catch(e){console.error("cloudCall error",e);return null;}
-}
-async function sGet(k,sh){if(!sh)return localStorage.getItem("p:"+k);return CACHE[k]??null;}
-async function sSet(k,v,sh){
-  if(!sh){localStorage.setItem("p:"+k,v);return true;}
-  CACHE[k]=v;
-  const r=await cloudCall({action:"set",key:k,value:v});
-  return r&&r.status==="success";
-}
-async function getJSON(k,sh){const v=await sGet(k,sh);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}}
-async function setJSON(k,o,sh){return sSet(k,JSON.stringify(o),sh);}
-/* Escrituras protegidas: el backend exige que S.organizerPinHash coincida con el
-   PIN guardado en el grupo (o permite el primer set si el grupo aún no tiene PIN,
-   para no bloquear la configuración inicial). Si el backend rechaza, devuelve false. */
-async function setJSONAuth(k,o){
-  CACHE[k]=JSON.stringify(o);
-  const r=await cloudCall({action:"set",key:k,value:JSON.stringify(o),pin:S.organizerPinHash});
-  if(r&&r.status==="success")return true;
-  if(r&&r.message)toast("❌ "+r.message,true,4000);
-  return false;
-}
-/* Igual que setJSONAuth pero con el PIN del propio jugador — usada para
-   preds_<id>, que el servidor ahora exige (antes cualquiera podía
-   sobrescribir el pronóstico de otro sin su PIN, porque no se pedía). */
-async function setJSONPlayerAuth(k,o){
-  CACHE[k]=JSON.stringify(o);
-  const r=await cloudCall({action:"set",key:k,value:JSON.stringify(o),pin:S.mePinHash});
-  if(r&&r.status==="success")return true;
-  if(r&&r.message)toast("❌ "+r.message,true,4000);
-  return false;
-}
-/* Para valores que YA son el hash final y no deben envolverse en JSON.stringify
-   (adminPin, pin_<id>) — el backend los compara como texto plano. Usar
-   setJSONAuth aquí los dejaría entre comillas literales en la hoja, lo que
-   rompe el login de quien tenga ese PIN (ya pasó una vez: ver
-   repararPinesLegacy en Code.gs). */
-async function setRawAuth(k,rawValue){
-  CACHE[k]=rawValue;
-  const r=await cloudCall({action:"set",key:k,value:rawValue,pin:S.organizerPinHash});
-  if(r&&r.status==="success")return true;
-  if(r&&r.message)toast("❌ "+r.message,true,4000);
-  return false;
-}
-async function fetchAllShared(){
-  const r=await cloudCall({action:"getAll"});
-  if(r){for(const k in r)CACHE[k]=r[k];return true;}
-  return false;
-}
+/* --- Storage local (identidad del dispositivo: "me", "organizer") --- Todo
+   lo demás ya se guarda en Supabase (ver edgeCall/restCall arriba). */
+async function getJSON(k){const v=localStorage.getItem("p:"+k);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}}
+async function setJSON(k,o){localStorage.setItem("p:"+k,JSON.stringify(o));return true;}
 
 /* --- State --- */
 const S={me:null,mePinHash:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,torneoId:null,modoSeguimiento:"torneo",equiposSeguidos:[],teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
@@ -594,7 +544,7 @@ function renderShell(){
       S.organizer=true;
       S.organizerPinHash=intentoHash;
       localStorage.setItem("pg_pinhash_"+TAB,intentoHash);
-      await setJSON("organizer",true,false);
+      await setJSON("organizer",true);
       S.view="resultados";
       renderShell();renderView();
       toast("Modo organizador activado ✓",false,3000);
@@ -608,7 +558,7 @@ async function salirModoOrganizador(){
   S.organizer=false;
   S.organizerPinHash=null;
   localStorage.removeItem("pg_pinhash_"+TAB);
-  await setJSON("organizer",false,false);
+  await setJSON("organizer",false);
   S.view="partidos";
   renderShell();renderView();
 }
@@ -1453,7 +1403,7 @@ async function showOnboarding(isChange){
           S.me=null;
           return;
         }
-        await setJSON("me",S.me,false);
+        await setJSON("me",S.me);
         S.mePinHash=pinHash;
         localStorage.setItem("pg_pinp_"+TAB+"_"+newId,pinHash);
         ov.remove();renderShell();renderView();
@@ -1464,7 +1414,7 @@ async function showOnboarding(isChange){
 
   async function _loginPlayer(player,pin,isFirstTime){
     S.me={id:player.id,name:player.name,ico:player.ico};
-    await setJSON("me",S.me,false);
+    await setJSON("me",S.me);
     S.mePinHash=_hashPin(pin);
     localStorage.setItem("pg_pinp_"+TAB+"_"+player.id,S.mePinHash);
     // S.allPreds ya viene completo desde estado-grupo (boot) -- no hace
@@ -1625,7 +1575,7 @@ function bootPanelCentral(){
     const err=document.getElementById("pc_err");
     await conCargando(document.getElementById("pc_entrar"),async()=>{
       const hash=_hashPin(pi.value.trim());
-      const r=await cloudCall({action:"adminListarGrupos",masterPin:hash});
+      const r=await edgeCall("admin-listar-grupos",{masterPin:hash});
       if(r&&r.status==="success"){
         PC_masterHash=hash;
         PC_grupos=r.grupos||[];
@@ -1685,7 +1635,7 @@ function renderPanelCentralMain(){
     btn.onclick=async()=>{
       if(!confirm(`¿Resetear el PIN de "${btn.dataset.nombre}"? El PIN anterior deja de funcionar de inmediato.`))return;
       await conCargando(btn,async()=>{
-        const r=await cloudCall({action:"adminResetearPin",masterPin:PC_masterHash,grupoId:btn.dataset.id});
+        const r=await edgeCall("admin-resetear-pin",{masterPin:PC_masterHash,grupoId:btn.dataset.id});
         if(r&&r.status==="success"){
           mostrarGrupoCreado(r.grupoId,r.pin,btn.dataset.nombre);
         }else{
@@ -1697,7 +1647,7 @@ function renderPanelCentralMain(){
   document.querySelectorAll(".pc-estado").forEach(sel=>{
     sel.onchange=async()=>{
       sel.disabled=true; // un <select> no puede mostrar el balón girando sin romper sus opciones — solo se deshabilita mientras trabaja
-      const r=await cloudCall({action:"adminActualizarPago",masterPin:PC_masterHash,grupoId:sel.dataset.id,estadoPago:sel.value});
+      const r=await edgeCall("admin-actualizar-pago",{masterPin:PC_masterHash,grupoId:sel.dataset.id,estadoPago:sel.value});
       sel.disabled=false;
       if(r&&r.status==="success")toast("Estado de pago actualizado ✓",false,2500);
       else toast("No se pudo actualizar.",true,3000);
@@ -1770,7 +1720,7 @@ function showCrearGrupo(){
     if(modoSeguimiento==="equipo"&&!equiposSeguidos.length){err.textContent="Elige al menos un equipo, o marca \"el torneo completo\".";return;}
     if(pin&&!/^\d{4}$/.test(pin)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
     await conCargando(document.getElementById("cg_crear"),async()=>{
-      const r=await cloudCall({action:"adminProvisionarGrupo",masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pin});
+      const r=await edgeCall("admin-provisionar-grupo",{masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pin});
       if(r&&r.status==="success"){
         ov.remove();
         mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo);
@@ -1803,7 +1753,7 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
   };
   document.getElementById("gc_cerrar").onclick=async()=>{
     ov.remove();
-    const r=await cloudCall({action:"adminListarGrupos",masterPin:PC_masterHash});
+    const r=await edgeCall("admin-listar-grupos",{masterPin:PC_masterHash});
     if(r&&r.status==="success"){PC_grupos=r.grupos||[];renderPanelCentralMain();}
   };
 }
@@ -1813,9 +1763,9 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
   if(ES_PANEL_CENTRAL){ bootPanelCentral(); return; }
   try{
     S.allPreds={};
-    S.me=await getJSON("me",false);
+    S.me=await getJSON("me");
     S.mePinHash=S.me?localStorage.getItem("pg_pinp_"+TAB+"_"+S.me.id):null;
-    S.organizer=(await getJSON("organizer",false))||false;
+    S.organizer=(await getJSON("organizer"))||false;
     S.organizerPinHash=S.organizer?localStorage.getItem("pg_pinhash_"+TAB):null;
 
     // estado-grupo trae en una sola llamada todo lo específico de este
