@@ -215,6 +215,12 @@ const REST_URL=SUPABASE_URL+"/rest/v1";
 
 /* --- Multi-tenant con soporte para ?grupo= o ?tab= --- */
 const _qp=new URLSearchParams(location.search);
+// El dominio pelado (predigoles.com o www.predigoles.com, sin ningún parámetro)
+// es el que se comparte en marketing -- siempre debe mostrar la landing, sin
+// importar si este navegador ya tiene un grupo guardado de una visita previa.
+// Se normaliza a la URL canónica /?home=1 (la misma que usa /home/) en vez de
+// dejar que el fallback de abajo decida caso por caso.
+if(location.search===""){ location.replace("/?home=1"); }
 const ES_PANEL_CENTRAL=_qp.get("admin")==="central";
 // Landing informativa: visita "en blanco" a predigoles.com, sin ?grupo=/?tab=
 // ni un grupo recordado de una visita anterior -- antes esto caía al grupo
@@ -1216,14 +1222,16 @@ function renderLanding(){
   const root=document.getElementById("root");
   const torneosChips=Object.entries(TOURNAMENTS).map(([id,t])=>`<span class="chip">${LANDING_BANDERAS[id]||"🏆"} ${escapeHtml(t.nombre)}</span>`).join("");
   root.innerHTML=`
-    <div class="kicker">PREDIGOLES</div>
-    <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
-    <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
+    <div class="topfijo">
+      <div class="kicker">PREDIGOLES</div>
+      <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
+      <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
 
-    <div id="landing_live"></div>
+      <div id="landing_live"></div>
 
-    <a class="btn" href="https://cesartez.gumroad.com/l/Predigoles" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
-    <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$15 USD · pago único por grupo, sin cobros por jugador</div>
+      <a class="btn" href="https://cesartez.gumroad.com/l/Predigoles" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+      <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$15 USD · pago único por grupo, sin cobros por jugador</div>
+    </div>
 
     <div class="rules" style="margin-top:22px">
       <div><b>⚡ Resultados en tiempo real</b> — los marcadores se sincronizan solos, nadie los digita a mano.</div>
