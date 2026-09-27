@@ -1207,27 +1207,45 @@ function renderResultados(c){
    Reemplaza todo el shell de #root (no es un overlay: no hay nada de app
    debajo que preservar). Mismo copy que la ficha de Gumroad, para que la
    promesa sea consistente entre dónde se compra y dónde se explica. */
+// Bandera decorativa por torneo -- solo para la fila de "torneos cubiertos"
+// de la landing; si se agrega un torneo nuevo y no está aquí, cae a 🏆 (no
+// rompe nada, solo se ve menos vistoso hasta que se agregue).
+const LANDING_BANDERAS={fpc_2026_2:"🇨🇴",la_liga_2026_27:"🇪🇸",champions_2026_27:"🏆",liga_mx_2026:"🇲🇽",liga_argentina_2026:"🇦🇷",nations_league_2026_27:"🇪🇺"};
+
 function renderLanding(){
   const root=document.getElementById("root");
+  const torneosChips=Object.entries(TOURNAMENTS).map(([id,t])=>`<span class="chip">${LANDING_BANDERAS[id]||"🏆"} ${escapeHtml(t.nombre)}</span>`).join("");
   root.innerHTML=`
     <div class="kicker">PREDIGOLES</div>
     <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
     <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
 
+    <div id="landing_live"></div>
+
     <a class="btn" href="https://cesartez.gumroad.com/l/Predigoles" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+    <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$15 USD · pago único por grupo, sin cobros por jugador</div>
 
     <div class="rules" style="margin-top:22px">
       <div><b>⚡ Resultados en tiempo real</b> — los marcadores se sincronizan solos, nadie los digita a mano.</div>
       <div style="margin-top:10px"><b>🎮 Interfaz estilo videojuego</b> — diseño oscuro, rápido y pensado para el celular.</div>
-      <div style="margin-top:10px"><b>🏆 Elige tu liga</b> — Liga BetPlay (Colombia), La Liga (España), Champions League, Liga MX (México) y Liga Profesional (Argentina).</div>
       <div style="margin-top:10px"><b>🔒 Privado por diseño</b> — cada grupo tiene su propio link y PIN, nadie de otro grupo ve tus datos.</div>
       <div style="margin-top:10px"><b>💬 100% informativo</b> — Predigoles no recauda ni administra dinero; cada quien le paga directo al ganador.</div>
     </div>
+
+    <div class="sectionlbl">Torneos cubiertos</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">${torneosChips}</div>
 
     <div class="addbox" style="margin-top:22px">
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿Ya tienes un grupo? Escribe su ID para entrar directo:</div>
       <input class="input" id="landing_grupo_id" placeholder="ej: miempresa2026" style="margin-bottom:10px">
       <button class="smallbtn full" id="landing_ir">Entrar a mi grupo</button>
+    </div>
+
+    <div class="sectionlbl">Preguntas frecuentes</div>
+    <div class="orglist">
+      <div style="padding:14px"><b style="color:var(--line)">¿Es una suscripción?</b><div style="color:var(--muted);font-size:13px;margin-top:4px">No — un solo pago por grupo, sin cobros por jugador ni mensualidades.</div></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">¿Ustedes manejan la plata del premio?</b><div style="color:var(--muted);font-size:13px;margin-top:4px">No. Predigoles es 100% informativo — ustedes definen el aporte de cada jugador, definen en la app como se distribuye el premio y cada quien le transfiere directo al ganador, como siempre lo has hecho con tus amigos.</div></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">¿Necesito instalar algo?</b><div style="color:var(--muted);font-size:13px;margin-top:4px">No, funciona desde el navegador de tu celular o computador.</div></div>
     </div>
   `;
   const irAlGrupo=()=>{
@@ -1236,6 +1254,21 @@ function renderLanding(){
   };
   document.getElementById("landing_ir").onclick=irAlGrupo;
   document.getElementById("landing_grupo_id").onkeydown=e=>{if(e.key==="Enter")irAlGrupo();};
+
+  // Ticker "en vivo": honesto, no decorativo -- si no hay ningún partido en
+  // vivo en este momento (lo normal la mayor parte del día), simplemente no
+  // se muestra nada, en vez de simular actividad que no existe.
+  (async()=>{
+    const live=await restCall("fixture_results?status=not.is.null&select=torneo_id,match_id,home_score,away_score,minute&order=synced_at.desc&limit=1");
+    if(!live||!live.length)return;
+    const lm=live[0];
+    const fx=await restCall(`fixtures?torneo_id=eq.${encodeURIComponent(lm.torneo_id)}&match_id=eq.${encodeURIComponent(lm.match_id)}&select=home,away`);
+    if(!fx||!fx.length)return;
+    const m=fx[0];
+    const torneoNombre=(TOURNAMENTS[lm.torneo_id]||{}).nombre||lm.torneo_id;
+    const el=document.getElementById("landing_live");
+    if(el)el.innerHTML=`<div class="chip" style="margin-top:14px;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4)"><span class="dot" style="background:var(--flare);box-shadow:0 0 10px var(--flare);animation:pulse-live 1s ease-in-out infinite"></span> EN VIVO ${lm.minute!=null?lm.minute+"' · ":""}<b style="color:var(--line);margin-left:4px">${escapeHtml(m.home)} ${lm.home_score}-${lm.away_score} ${escapeHtml(m.away)}</b> · ${escapeHtml(torneoNombre)}</div>`;
+  })();
 }
 
 function showGrupoNoEncontrado(){
