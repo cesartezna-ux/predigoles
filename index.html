@@ -1205,7 +1205,7 @@ function renderResultados(c){
     return b.kick-a.kick;
   });
   
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · Edita el equipo de tus partidos personalizados con ✏️, la fecha/hora/sede con 📅 (solo mientras no tenga resultado), e ingresa marcadores.</div>`;
+  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · En tus partidos personalizados edita el equipo con ✏️ y la fecha/hora/sede con 📅 (mientras no tengan resultado), e ingresa sus marcadores. Los partidos oficiales se actualizan solos vía API.</div>`;
   html+=`<div style="text-align:right;margin-bottom:10px"><button class="link-btn" id="rs_salir">🔑 salir del modo organizador</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
   html+=`<div class="addbox" style="border-color:rgba(54,224,191,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showModoSeguimiento()" style="background:var(--raise);color:var(--mint)">⚽ Modo de seguimiento (equipo o torneo completo)</button></div>`;
@@ -1216,7 +1216,10 @@ function renderResultados(c){
     const r=S.resWork[m.id]||{},locked=m.kick!=null&&S.now>=m.kick,sinFecha=m.kick==null;
     const tieneResultado=!!S.results[m.id];
     const cuandoLabel=sinFecha?`<span style="color:var(--flare)">📋 Sin fecha confirmada</span>`:`${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}`;
-    const btnFecha=tieneResultado?"":`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`;
+    // La fecha/hora/sede de un partido oficial también viene de la API y se
+    // mantiene sola (sincronizar-resultados la refresca cada corrida) -- el
+    // botón 📅 solo aplica a partidos personalizados, igual que el ✏️.
+    const btnFecha=(m.custom&&!tieneResultado)?`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`:"";
     // Los resultados de partidos OFICIALES solo llegan por sincronización
     // automática (fixture_results, vía API) -- el organizador ya no puede
     // corregirlos a mano, para que ningún grupo se desvíe del marcador real
