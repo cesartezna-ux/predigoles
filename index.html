@@ -113,6 +113,22 @@
   .rules{background:var(--panel);border:1px solid var(--faint);border-radius:14px;padding:14px 16px;margin-top:16px;font-size:13px;color:var(--muted);line-height:1.6}
   .rules b{color:var(--line)}
   .rules .pill{display:inline-block;font-family:var(--score);font-weight:700;color:var(--gold);font-size:15px;margin-right:2px}
+  /* Panel de Organizador: filas de configuración agrupadas por sección,
+     estilo "Ajustes" nativo -- .orgrow/.orgico son nombres propios (no
+     .row/.ico) para no chocar con las clases ya usadas por el ranking. */
+  .grouphead{display:flex;align-items:center;gap:10px;margin:4px 0 2px}
+  .backbtn{background:var(--panel);border:1px solid var(--faint);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--line);font-size:16px;flex:none;cursor:pointer}
+  .idline{font-size:12.5px;color:var(--muted)}
+  .idline b{color:var(--line);font-weight:600}
+  .sectionlbl{font:700 10.5px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:22px 2px 8px}
+  .orglist{background:var(--panel);border:1px solid var(--faint);border-radius:14px;overflow:hidden}
+  .orgrow{display:flex;align-items:center;gap:12px;padding:14px;background:none;border:none;width:100%;box-sizing:border-box;text-align:left;cursor:pointer;color:var(--line);font:inherit}
+  .orgrow+.orgrow{border-top:1px solid var(--faint)}
+  .orgico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+  .orgrow .lbl{flex:1;font-size:14px;font-weight:500}
+  .orgrow .chev{color:var(--muted);font-size:14px}
+  .exitzone{margin-top:34px;padding-top:22px;border-top:1px solid var(--faint)}
+  .exitbtn{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;border:1px solid var(--faint);background:var(--panel);color:var(--line);border-radius:14px;padding:10px 14px;font:700 14px var(--body);cursor:pointer}
   .overlay{position:fixed;inset:0;z-index:100;background:rgba(5,14,10,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
   .card{width:100%;max-width:380px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid rgba(255,200,69,.3);border-radius:20px;padding:24px}
   .card h2{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:26px;margin:4px 0 6px;letter-spacing:.04em}
@@ -303,7 +319,7 @@ const TOURNAMENTS={
 /* --- Estado del torneo activo del grupo, resuelto en boot() a partir de la
    llave "torneoId" guardada en la nube. Estas variables se llenan una vez que
    se conoce el torneo, con activarTorneo(). --- */
-let FIXTURE=[],FLAG={},ESCUDOS={},ALLOWED_TEAMS=[];
+let FIXTURE=[],FLAG={},ESCUDOS={};
 function normalizarEquipo(s){return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();}
 let EQUIPO_CANONICO={}; // nombre normalizado -> nombre canónico (el que usan FLAG/ESCUDOS/el filtro de seguimiento)
 function nombreCanonico(n){return EQUIPO_CANONICO[normalizarEquipo(n)]||n;}
@@ -312,7 +328,6 @@ async function activarTorneo(id){
   const t=TOURNAMENTS[id]||TOURNAMENTS[TOURNAMENT_DEFAULT];
   FLAG=t.FLAG;
   ESCUDOS=t.ESCUDOS;
-  ALLOWED_TEAMS=Object.keys(FLAG).concat(t.EXTRA_ALLOWED||[]).sort();
   EQUIPO_CANONICO={};
   Object.keys(FLAG).forEach(nombre=>{EQUIPO_CANONICO[normalizarEquipo(nombre)]=nombre;});
   let fixturesRows=[];
@@ -770,9 +785,6 @@ function updateSaveBar(){
   }else if(S.view==="partidos"&&S.dirty.size>0){
     inner.innerHTML=`<button class="btn" id="saveBtn">Guardar mis pronósticos (${S.dirty.size})</button>`;
     document.getElementById("saveBtn").onclick=savePreds;bar.style.display="block";
-  }else if(S.view==="resultados"&&S.resDirty&&S.resDirty.size>0){
-    inner.innerHTML=`<button class="btn" id="saveResBtn">Guardar resultados (${S.resDirty.size})</button>`;
-    document.getElementById("saveResBtn").onclick=saveResultsBatch;bar.style.display="block";
   }else bar.style.display="none";
 }
 
@@ -998,98 +1010,6 @@ function showModoSeguimiento(){
   };
 }
 
-/* --- Selección de Clasificados (genérico, sirve para cualquier torneo con fases de eliminación) --- */
-function editTeamName(id,side,current){
-  const old=document.getElementById("ovl");if(old)old.remove();
-  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
-  document.body.appendChild(ov);
-  
-  let optionsHtml=ALLOWED_TEAMS.map(team=>`<option value="${team}" ${team===current?"selected":""}>${team}</option>`).join("");
-  
-  ov.innerHTML=`<div class="card">
-    <div class="kicker" style="color:var(--gold)">Asignación de Clasificados</div>
-    <h2>Definir Equipo</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Selecciona el club clasificado para esta llave:</p>
-    <label class="field">Equipo ${side==="home"?"Local":"Visitante"}</label>
-    <select class="select-popup" id="popup_select_team">${optionsHtml}</select>
-    <button class="btn" id="popup_save_team">Confirmar Cambio</button>
-    <button class="btn ghost" id="popup_cancel_team" style="margin-top:10px">Cancelar</button>
-  </div>`;
-  
-  document.getElementById("popup_cancel_team").onclick=()=>ov.remove();
-  document.getElementById("popup_save_team").onclick=async()=>{
-    const name=document.getElementById("popup_select_team").value;
-    await conCargando(document.getElementById("popup_save_team"),async()=>{
-      S.teamOverrides[id]=S.teamOverrides[id]||{};
-      S.teamOverrides[id][side]=name;
-      const r=await edgeCall("guardar-ajuste-partido",{pin:S.organizerPinHash,matchId:id,[side]:name});
-      if(!r||r.status!=="success")return;
-      ov.remove();
-      toast("Equipo actualizado ✓",false,2500);
-      renderResultados(document.getElementById("content"));
-    },"Guardando...");
-  };
-}
-
-/* --- Editar fecha/hora/sede de un partido (organizador, solo si no tiene resultado) --- */
-function _epochToLocalInputValue(epoch){
-  if(epoch==null)return"";
-  const d=new Date(epoch-5*60*60*1000);
-  return d.toISOString().slice(0,16);
-}
-function editMatchSchedule(id,currentKick,currentVenue){
-  const old=document.getElementById("ovl");if(old)old.remove();
-  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
-  document.body.appendChild(ov);
-  const valorActual=_epochToLocalInputValue(currentKick);
-  ov.innerHTML=`<div class="card">
-    <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
-    <h2>Fecha, hora y sede</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Solo se puede editar mientras el partido no tenga resultado cargado. La hora es en horario de Colombia.</p>
-    <label class="field">Fecha y hora (Colombia)</label>
-    <input class="input" id="ems_kick" type="datetime-local" value="${valorActual}">
-    <p style="color:var(--muted);font-size:12px;margin:10px 0 4px">Deja el campo vacío si todavía no está confirmada — el partido queda en "Por confirmar".</p>
-    <label class="field" style="margin-top:10px">Sede</label>
-    <input class="input" id="ems_venue" maxlength="60" value="${escapeHtml(currentVenue||"")}">
-    <div id="ems_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
-    <button class="btn" id="ems_save" style="margin-top:10px">Guardar</button>
-    <button class="btn ghost" id="ems_clear" style="margin-top:10px;border-color:rgba(255,77,109,.4);color:var(--flare)">Quitar fecha (dejar "por confirmar")</button>
-    <button class="btn ghost" id="ems_cancel" style="margin-top:10px">Cancelar</button>
-  </div>`;
-  document.getElementById("ems_cancel").onclick=()=>ov.remove();
-  document.getElementById("ems_clear").onclick=async()=>{
-    await conCargando(document.getElementById("ems_clear"),async()=>{
-      S.teamOverrides[id]=S.teamOverrides[id]||{};
-      S.teamOverrides[id].kick=null;
-      const r=await edgeCall("guardar-ajuste-partido",{pin:S.organizerPinHash,matchId:id,kick:null});
-      if(!r||r.status!=="success")return;
-      ov.remove();
-      toast("Partido movido a \"Por confirmar\" ✓",false,3000);
-      if(S.view==="resultados")renderResultados(document.getElementById("content"));
-    },"Un momento...");
-  };
-  document.getElementById("ems_save").onclick=async()=>{
-    const val=document.getElementById("ems_kick").value;
-    const venue=document.getElementById("ems_venue").value.trim();
-    const err=document.getElementById("ems_err");
-    if(val){
-      const testEpoch=new Date(val+":00-05:00").getTime();
-      if(isNaN(testEpoch)){err.textContent="Fecha inválida.";return;}
-    }
-    await conCargando(document.getElementById("ems_save"),async()=>{
-      S.teamOverrides[id]=S.teamOverrides[id]||{};
-      const payload={pin:S.organizerPinHash,matchId:id};
-      if(val){const kick=new Date(val+":00-05:00").getTime();S.teamOverrides[id].kick=kick;payload.kick=kick;}
-      if(venue){S.teamOverrides[id].venue=venue;payload.venue=venue;}
-      const r=await edgeCall("guardar-ajuste-partido",payload);
-      if(!r||r.status!=="success")return;
-      ov.remove();
-      toast("Partido actualizado ✓",false,3000);
-      if(S.view==="resultados")renderResultados(document.getElementById("content"));
-    },"Guardando...");
-  };
-}
-
 /* --- Configuración de premios --- */
 function showBettingConfig(){
   const old=document.getElementById("ovl");if(old)old.remove();
@@ -1146,100 +1066,70 @@ function showBettingConfig(){
 }
 
 /* --- Panel de Resultados --- */
+// Panel de Organizador: solo lista lo que el admin puede realmente accionar
+// (configuración del grupo, agrupada por sección) -- ya no lista los
+// partidos del torneo. Los oficiales se sincronizan solos vía API (ver
+// sincronizar-resultados) y los "personalizados" nunca tuvieron una forma
+// real de crearse desde la app, así que no hay nada real que mostrar ahí;
+// si algún día se construye esa función de verdad, se agrega como su
+// propia sección, no como un hueco a medio llenar (ver backlog).
 function renderResultados(c){
-  S.resDirty=S.resDirty||new Set();S.resWork=Object.assign({},S.results);
-  const ms=allMatches().slice().sort((a,b)=>{
-    if(a.kick==null&&b.kick==null)return 0;
-    if(a.kick==null)return -1;
-    if(b.kick==null)return 1;
-    return b.kick-a.kick;
-  });
-  
-  let html=`<div class="rules" style="margin-top:8px;margin-bottom:14px">ID del grupo: <b style="color:var(--gold)">${TAB}</b> · En tus partidos personalizados edita el equipo con ✏️ y la fecha/hora/sede con 📅 (mientras no tengan resultado), e ingresa sus marcadores. Los partidos oficiales se actualizan solos vía API.</div>`;
-  html+=`<div style="text-align:right;margin-bottom:10px"><button class="link-btn" id="rs_salir">🔑 salir del modo organizador</button></div>`;
-  html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showGroupEdit()" style="background:var(--raise);color:var(--gold)">✏️ Editar nombre del grupo / PIN admin</button></div>`;
-  html+=`<div class="addbox" style="border-color:rgba(54,224,191,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showModoSeguimiento()" style="background:var(--raise);color:var(--mint)">⚽ Modo de seguimiento (equipo o torneo completo)</button></div>`;
-  html+=`<div class="addbox" style="border-color:rgba(255,77,109,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showPinReset()" style="background:var(--raise);color:var(--flare)">🔑 Resetear PIN de jugador</button></div>`;
-  html+=`<div class="addbox" style="border-color:rgba(255,200,69,.4);margin-bottom:15px"><button class="smallbtn full" onclick="showBettingConfig()" style="background:var(--raise);color:var(--gold)">💰 Configurar premios / inscripción</button></div>`;
-  
-  for(const m of ms){
-    const r=S.resWork[m.id]||{},locked=m.kick!=null&&S.now>=m.kick,sinFecha=m.kick==null;
-    const tieneResultado=!!S.results[m.id];
-    const cuandoLabel=sinFecha?`<span style="color:var(--flare)">📋 Sin fecha confirmada</span>`:`${whenHtml(m.kick)} ${locked?"":"<span style='color:var(--flare)'>· aún no inicia</span>"}`;
-    // La fecha/hora/sede de un partido oficial también viene de la API y se
-    // mantiene sola (sincronizar-resultados la refresca cada corrida) -- el
-    // botón 📅 solo aplica a partidos personalizados, igual que el ✏️.
-    const btnFecha=(m.custom&&!tieneResultado)?`<button class="editnm" data-mid="${m.id}" data-kick="${m.kick||""}" data-venue="${escapeHtml(m.venue)}" title="Editar fecha/hora/sede" onclick="editMatchSchedule('${m.id}',${m.kick||"null"},'${escapeHtml(m.venue).replace(/'/g,"&#39;")}')">📅</button>`:"";
-    // Los resultados de partidos OFICIALES solo llegan por sincronización
-    // automática (fixture_results, vía API) -- el organizador ya no puede
-    // corregirlos a mano, para que ningún grupo se desvíe del marcador real
-    // compartido entre todos. Los personalizados (custom_matches) siguen
-    // siendo manuales porque por definición no existen en ninguna API.
-    const scoreHome=m.custom
-      ?`<input class="box" id="rh_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.h!=null?r.h:""}">`
-      :`<span class="box" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">${r.h!=null?r.h:"–"}</span>`;
-    const scoreAway=m.custom
-      ?`<input class="box" id="ra_${m.id}" type="number" inputmode="numeric" min="0" max="49" placeholder="–" value="${r.a!=null?r.a:""}">`
-      :`<span class="box" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">${r.a!=null?r.a:"–"}</span>`;
-    // Decisión de producto: si el partido viene de la API (calendario oficial,
-    // incluyendo fases eliminatorias), el admin NUNCA debe poder asignarle
-    // equipos -- ni siquiera con resultado pendiente. Solo los partidos
-    // personalizados (sin fuente en ninguna API) admiten esta edición.
-    const btnEditHome=m.custom?`<button class="editnm" data-mid="${m.id}" data-side="home" data-cur="${escapeHtml(m.home)}" title="Editar nombre">✏️</button>`:"";
-    const btnEditAway=m.custom?`<button class="editnm" data-mid="${m.id}" data-side="away" data-cur="${escapeHtml(m.away)}" title="Editar nombre">✏️</button>`:"";
-    html+=`<div class="match" style="border-radius:14px">
-      <div class="mtop"><span class="grp">🏆 ${m.g}</span>
-      <span class="when">${cuandoLabel} ${btnFecha}</span></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📍 ${escapeHtml(m.venue)}${m.custom?"":" · resultado sincronizado automáticamente"}</div>
-      <div class="team"><span class="fl">${flag(m.home)}</span><span class="nm">${escapeHtml(m.home)}</span>${btnEditHome}${scoreHome}</div>
-      <div class="divider"></div>
-      <div class="team"><span class="fl">${flag(m.away)}</span><span class="nm">${escapeHtml(m.away)}</span>${btnEditAway}${scoreAway}</div>
-    </div>`;
-  }
+  const html=`
+    <div class="grouphead">
+      <button class="backbtn" id="rs_salir_top" title="Salir del modo organizador">←</button>
+      <div>
+        <div class="kicker">MODO ORGANIZADOR</div>
+        <div class="idline"><b>${escapeHtml(S.groupName||TAB)}</b> · ${escapeHtml(TAB)}</div>
+      </div>
+    </div>
+
+    <div class="sectionlbl">Tu grupo</div>
+    <div class="orglist">
+      <button class="orgrow" id="rs_editgrupo">
+        <div class="orgico" style="background:rgba(255,200,69,.15);color:var(--gold)">✏️</div>
+        <div class="lbl">Nombre y PIN del grupo</div>
+        <div class="chev">›</div>
+      </button>
+    </div>
+
+    <div class="sectionlbl">Juego</div>
+    <div class="orglist">
+      <button class="orgrow" id="rs_seguimiento">
+        <div class="orgico" style="background:rgba(54,224,191,.15);color:var(--mint)">⚽</div>
+        <div class="lbl">Qué equipo(s) seguir</div>
+        <div class="chev">›</div>
+      </button>
+      <button class="orgrow" id="rs_premios">
+        <div class="orgico" style="background:rgba(255,200,69,.15);color:var(--gold)">🏆</div>
+        <div class="lbl">Premio del grupo</div>
+        <div class="chev">›</div>
+      </button>
+    </div>
+
+    <div class="sectionlbl">Jugadores</div>
+    <div class="orglist">
+      <button class="orgrow" id="rs_pinjugador">
+        <div class="orgico" style="background:rgba(255,77,109,.15);color:var(--flare)">🔑</div>
+        <div class="lbl">Restablecer PIN de un jugador</div>
+        <div class="chev">›</div>
+      </button>
+    </div>
+
+    <div class="exitzone">
+      <button class="exitbtn" id="rs_salir">
+        <div class="orgico" style="background:var(--faint);color:var(--line)">🚪</div>
+        <span>Salir del modo organizador</span>
+      </button>
+    </div>
+  `;
   c.innerHTML=html;
+  document.getElementById("rs_salir_top").onclick=salirModoOrganizador;
   document.getElementById("rs_salir").onclick=salirModoOrganizador;
-
-  c.querySelectorAll(".editnm[data-side]").forEach(b=>{
-    b.onclick=()=>editTeamName(b.dataset.mid,b.dataset.side,b.dataset.cur);
-  });
-  for(const m of ms){
-    if(!m.custom)continue; // solo los personalizados tienen inputs editables
-    const rh=document.getElementById("rh_"+m.id),ra=document.getElementById("ra_"+m.id);
-    if(!rh||!ra)continue;
-    const on=()=>{
-      let h=clampVal(rh.value),a=clampVal(ra.value);
-      if(rh.value!==String(h))rh.value=h;if(ra.value!==String(a))ra.value=a;
-      if(h===""||a==="")delete S.resWork[m.id];else S.resWork[m.id]={h,a};
-      S.resDirty.add(m.id);updateSaveBar();
-    };
-    rh.oninput=on;ra.oninput=on;
-  }
-  updateSaveBar();
+  document.getElementById("rs_editgrupo").onclick=showGroupEdit;
+  document.getElementById("rs_seguimiento").onclick=showModoSeguimiento;
+  document.getElementById("rs_premios").onclick=showBettingConfig;
+  document.getElementById("rs_pinjugador").onclick=showPinReset;
 }
-async function saveResultsBatch(){
-  // S.resDirty solo puede contener partidos personalizados (los oficiales ya
-  // no tienen input editable), así que cada uno se guarda por separado vía
-  // guardar-resultado-personalizado -- nunca se toca fixture_results desde acá.
-  const btn=document.getElementById("saveResBtn");
-  await conCargando(btn,async()=>{
-    const ids=[...S.resDirty];
-    const resultados=await Promise.all(ids.map(async id=>{
-      const r=S.resWork[id]||{};
-      const resp=await edgeCall("guardar-resultado-personalizado",{matchId:id,homeScore:r.h,awayScore:r.a,pin:S.organizerPinHash});
-      return{id,ok:resp&&resp.status==="success"};
-    }));
-    const okIds=resultados.filter(x=>x.ok).map(x=>x.id);
-    for(const id of okIds){
-      if(S.resWork[id]!=null)S.results[id]=S.resWork[id];else delete S.results[id];
-    }
-    for(const id of okIds)S.resDirty.delete(id);
-    updateSaveBar();
-    const fallidos=resultados.length-okIds.length;
-    toast(fallidos===0?"Resultados guardados ✓":`${okIds.length} guardado(s), ${fallidos} falló(aron)`,fallidos>0);
-    if(S.view==="ranking")renderRanking(document.getElementById("content"));
-  },"Guardando...");
-}
-
 /* --- Setup inicial --- */
 function showGrupoNoEncontrado(){
   const old=document.getElementById("ovl");if(old)old.remove();
