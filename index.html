@@ -1838,7 +1838,10 @@ function renderPanelCentralMain(){
           Admin: ${escapeHtml(s.nombreAdmin)} · ${escapeHtml(s.celularAdmin)} · ${escapeHtml(s.correoAdmin)}<br>
           PIN deseado: ${s.pinDeseado?escapeHtml(s.pinDeseado):"(sin preferencia)"} · Pedido: ${fmtFechaCorta(s.fechaSolicitud)}
         </div>
-        <button class="link-btn pc-solicitud-ok" data-id="${escapeHtml(s.id)}" style="color:var(--mint);margin-top:8px">✓ Marcar como atendida</button>
+        <div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap">
+          <button class="link-btn pc-solicitud-crear" data-id="${escapeHtml(s.id)}" style="color:var(--gold)">➕ Crear grupo con estos datos</button>
+          <button class="link-btn pc-solicitud-ok" data-id="${escapeHtml(s.id)}" style="color:var(--mint)">✓ Marcar como atendida</button>
+        </div>
       </div>`).join("")}
     </div>
   `:"";
@@ -1856,6 +1859,28 @@ function renderPanelCentralMain(){
   `);
   document.getElementById("pc_salir").onclick=()=>{PC_masterHash=null;bootPanelCentral();};
   document.getElementById("pc_nuevo").onclick=showCrearGrupo;
+  document.querySelectorAll(".pc-solicitud-crear").forEach(btn=>{
+    btn.onclick=async()=>{
+      const s=PC_solicitudes.find(x=>x.id===btn.dataset.id);
+      if(!s)return;
+      await conCargando(btn,async()=>{
+        const r=await edgeCall("admin-provisionar-grupo",{
+          masterPin:PC_masterHash,grupoId:s.grupoId,nombreGrupo:s.nombreGrupo,torneoId:s.torneoId,
+          modoSeguimiento:s.modoSeguimiento,equiposSeguidos:s.equiposSeguidos||[],
+          nombreAdmin:s.nombreAdmin,celularAdmin:s.celularAdmin,correoAdmin:s.correoAdmin,pin:s.pinDeseado||"",
+        });
+        if(r&&r.status==="success"){
+          // La solicitud ya cumplió su propósito -- se marca atendida sola,
+          // sin que el admin tenga que dar un segundo clic aparte.
+          await edgeCall("admin-marcar-solicitud-atendida",{masterPin:PC_masterHash,solicitudId:s.id});
+          PC_solicitudes=PC_solicitudes.filter(x=>x.id!==s.id);
+          mostrarGrupoCreado(r.grupoId,r.pin,s.nombreGrupo);
+        }else{
+          toast((r&&r.message)||"No se pudo crear el grupo.",true,4000);
+        }
+      },"Creando...");
+    };
+  });
   document.querySelectorAll(".pc-solicitud-ok").forEach(btn=>{
     btn.onclick=async()=>{
       await conCargando(btn,async()=>{
