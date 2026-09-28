@@ -1150,7 +1150,9 @@ function showBettingConfig(){
     const insc=+document.getElementById("bc_insc").value||0;
     const p1=+document.getElementById("bc_p1").value||0,p2=+document.getElementById("bc_p2").value||0,p3=+document.getElementById("bc_p3").value||0;
     const err=document.getElementById("bc_err");
-    if(insc<0||p1<0||p2<0||p3<0){err.textContent="Valores no válidos.";return;}
+    if(insc<0||p1<0||p2<0||p3<0||p1>100||p2>100||p3>100){err.textContent="Los porcentajes deben estar entre 0 y 100.";return;}
+    const suma=p1+p2+p3;
+    if(suma!==0&&suma!==100){err.textContent="Los porcentajes deben sumar exactamente 100% (o déjalos todos en 0 si aún no defines el reparto).";return;}
     await conCargando(document.getElementById("bc_save"),async()=>{
       S.betting={inscripcion:insc,premios:{p1,p2,p3}};
       const r=await edgeCall("guardar-premios",{pin:S.organizerPinHash,inscripcion:insc,premios:{p1,p2,p3}});
