@@ -416,7 +416,7 @@ async function activarTorneo(id){
     // que getFixture antes no exigía PIN.
     const idEnc=encodeURIComponent(id);
     const [fr,er]=await Promise.all([
-      restCall(`fixtures?torneo_id=eq.${idEnc}&select=match_id,fase,kickoff,home,away,venue`),
+      restCall(`fixtures?torneo_id=eq.${idEnc}&select=match_id,fase,kickoff,home,away,venue&order=kickoff.asc`),
       restCall(`team_crests?torneo_id=eq.${idEnc}&select=team_name,crest_url`),
     ]);
     fixturesRows=fr||[];
@@ -762,7 +762,11 @@ function buildDayList(){
     if(!map.has(dk))map.set(dk,{key:dk,label:cap(FD.format(m.kick)),matches:[]});
     map.get(dk).matches.push(m);
   }
-  return[...map.values()];
+  // Orden cronológico garantizado por el propio código, sin depender de que
+  // la fuente (fixtures ordenado + partidos personalizados sin ordenar) ya
+  // venga en orden -- de eso depende que defaultDay() caiga cerca de "hoy"
+  // en vez de saltar a un día cualquiera del calendario en torneos largos.
+  return[...map.values()].sort((a,b)=>a.matches[0].kick-b.matches[0].kick);
 }
 function defaultDay(days){
   if(S.selectedDay&&days.some(d=>d.key===S.selectedDay))return S.selectedDay;
