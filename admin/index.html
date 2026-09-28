@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- Acceso privado al Panel Central. A propósito NO se enlaza desde
+     ningún lugar público (ni el Home ni la app) -- el login sigue
+     protegido por el PIN maestro + rate limiting, pero no hace falta
+     anunciar dónde vive la pantalla de login a cualquier visitante. -->
+<meta http-equiv="refresh" content="0; url=/?admin=central">
+<script>location.replace("/?admin=central");</script>
+<title>Predigoles</title>
+</head>
+<body></body>
+</html>

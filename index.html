@@ -566,6 +566,17 @@ function calcularLimite(kickEpoch){
 }
 
 function _hashPin(pin){let h=0;for(let i=0;i<pin.length;i++){h=((h<<5)-h)+pin.charCodeAt(i);h|=0;}return"ph_"+Math.abs(h).toString(36);}
+// Solo para el PIN maestro (controla alta/reseteo de TODOS los grupos --
+// el credencial de mayor radio de impacto del sistema): hash criptográfico
+// real, a diferencia de _hashPin (un checksum de 32 bits, suficiente contra
+// fuerza bruta online porque está limitada por rate limiting, pero inútil
+// si el hash guardado llegara a filtrarse -- se invierte en segundos). No
+// se aplicó lo mismo a PIN de organizador/jugador todavía: requeriría
+// migrar en caliente los hashes ya guardados de los grupos activos.
+async function _hashMasterPin(pin){
+  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pin));
+  return"sha256_"+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 const root=document.getElementById("root");
@@ -1646,9 +1657,9 @@ function bootPanelCentral(){
   pcCard(`<div class="card" style="max-width:100%">
     <div class="kicker" style="color:var(--gold)">Predigoles · Administrador Central</div>
     <h2>Acceso</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Este PIN es distinto al de cualquier grupo — es tuyo, único, y no se guarda en este navegador entre sesiones por seguridad.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Este PIN es distinto al de cualquier grupo — es tuyo, único, y no se guarda en este navegador entre sesiones por seguridad. Debe tener mayúsculas, minúsculas y al menos un carácter especial.</p>
     <label class="field">PIN maestro</label>
-    <input class="input" id="pc_pin" type="password" inputmode="numeric" style="letter-spacing:.3em;font-size:22px;text-align:center">
+    <input class="input" id="pc_pin" type="password" style="letter-spacing:.1em;font-size:20px;text-align:center">
     <div id="pc_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
     <button class="btn" id="pc_entrar" style="margin-top:10px">Entrar</button>
   </div>`);
@@ -1657,7 +1668,7 @@ function bootPanelCentral(){
   async function intentar(){
     const err=document.getElementById("pc_err");
     await conCargando(document.getElementById("pc_entrar"),async()=>{
-      const hash=_hashPin(pi.value.trim());
+      const hash=await _hashMasterPin(pi.value.trim());
       const r=await edgeCall("admin-listar-grupos",{masterPin:hash});
       if(r&&r.status==="success"){
         PC_masterHash=hash;

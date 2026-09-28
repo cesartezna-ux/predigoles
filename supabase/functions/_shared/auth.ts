@@ -37,7 +37,11 @@ export async function checkAdminAuth(
 // Traducción de checkMasterAuth() en Code.gs. El PIN maestro NUNCA vive
 // en una tabla -- solo en el secreto MASTER_PIN_HASH del proyecto de
 // Supabase (equivalente a PropertiesService en Apps Script), configurado
-// con `supabase secrets set MASTER_PIN_HASH=<hash>`.
+// con `supabase secrets set MASTER_PIN_HASH=<hash>`. La comparación es
+// agnóstica al algoritmo de hash (solo compara strings) -- el frontend
+// calcula el hash real (hoy SHA-256, prefijo "sha256_", vía _hashMasterPin
+// en index.html) y este archivo no necesita cambiar si ese algoritmo
+// cambia en el futuro.
 export async function checkMasterAuth(
   db: SupabaseClient,
   pinEnviado: string | null | undefined,
