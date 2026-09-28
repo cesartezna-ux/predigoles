@@ -112,7 +112,7 @@
   .empty .big{font-size:34px;display:block;margin-bottom:10px}
   .rules{background:var(--panel);border:1px solid var(--faint);border-radius:14px;padding:14px 16px;margin-top:16px;font-size:13px;color:var(--muted);line-height:1.6}
   .rules b{color:var(--line)}
-  .rules .pill{display:inline-block;font-family:var(--score);font-weight:700;color:var(--gold);font-size:15px;margin-right:2px}
+  .pill{display:inline-block;font-family:var(--score);font-weight:700;color:var(--gold);font-size:15px;margin-right:2px}
   /* Panel de Organizador: filas de configuración agrupadas por sección,
      estilo "Ajustes" nativo -- .orgrow/.orgico son nombres propios (no
      .row/.ico) para no chocar con las clases ya usadas por el ranking. */
@@ -130,6 +130,7 @@
   .exitzone{margin-top:34px;padding-top:22px;border-top:1px solid var(--faint)}
   .exitbtn{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;border:1px solid var(--faint);background:var(--panel);color:var(--line);border-radius:14px;padding:10px 14px;font:700 14px var(--body);cursor:pointer}
   .overlay{position:fixed;inset:0;z-index:100;background:rgba(5,14,10,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
+  .fab{position:fixed;right:16px;bottom:16px;z-index:40;width:52px;height:52px;border-radius:50%;background:var(--panel2);border:1px solid rgba(255,200,69,.35);color:var(--line);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.45)}
   .card{width:100%;max-width:380px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid rgba(255,200,69,.3);border-radius:20px;padding:24px}
   .card h2{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:26px;margin:4px 0 6px;letter-spacing:.04em}
   .card p{color:var(--muted);font-size:13px;margin:0 0 18px;line-height:1.55}
@@ -606,6 +607,61 @@ async function conCargando(btn,fn,texto){
       btn.disabled=false;
     }
   }
+}
+
+/* --- Botón flotante de comentarios --- */
+// Vive en document.body (no en #root), así que sobrevive a cualquier
+// renderLanding()/renderShell() que reescriba #root -- se crea una sola
+// vez al arrancar y queda ahí en el Home y en la app, para jugadores y
+// organizadores de cualquier grupo. No aparece en Panel Central (ahí el
+// destinatario de los comentarios es el mismo que los vería) ni en /setup
+// (formulario de compra ya enfocado, agregarlo ahí solo sería ruido).
+function initFeedbackButton(){
+  if(document.getElementById("fabFeedback"))return;
+  const btn=document.createElement("button");
+  btn.id="fabFeedback";
+  btn.className="fab";
+  btn.title="Enviar un comentario";
+  btn.textContent="💬";
+  btn.onclick=showFeedbackForm;
+  document.body.appendChild(btn);
+}
+
+function showFeedbackForm(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card">
+    <div class="kicker" style="color:var(--mint)">Predigoles</div>
+    <h2>Cuéntanos qué piensas</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Sugerencias, errores, ideas -- lo que quieras decirnos.</p>
+    <textarea class="input" id="fb_mensaje" rows="5" maxlength="2000" placeholder="Escribe aquí..." style="resize:vertical;font-family:var(--body)"></textarea>
+    <div id="fb_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+    <button class="btn" id="fb_enviar" style="margin-top:10px">Enviar</button>
+    <button class="btn ghost" id="fb_cancelar" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  setTimeout(()=>document.getElementById("fb_mensaje").focus(),80);
+  document.getElementById("fb_cancelar").onclick=()=>ov.remove();
+  document.getElementById("fb_enviar").onclick=async()=>{
+    const err=document.getElementById("fb_err");
+    const mensaje=document.getElementById("fb_mensaje").value.trim();
+    if(!mensaje){err.textContent="Escribe algo antes de enviar.";return;}
+    await conCargando(document.getElementById("fb_enviar"),async()=>{
+      const origen=ES_LANDING?"landing":(S.organizer?"organizador":"jugador");
+      const r=await edgeCall("enviar-comentario",{
+        origen,
+        grupoId:ES_LANDING?null:TAB,
+        autorNombre:S.me?S.me.name:null,
+        mensaje,
+      });
+      if(r&&r.status==="success"){
+        ov.remove();
+        toast("¡Gracias! Ya lo recibimos ✓",false,3000);
+      }else{
+        err.textContent=(r&&r.message)||"No se pudo enviar. Intenta de nuevo.";
+      }
+    },"Enviando...");
+  };
 }
 
 /* --- Shell --- */
@@ -1369,6 +1425,13 @@ function renderLanding(){
     <div class="sectionlbl">Torneos cubiertos</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">${torneosChips}</div>
 
+    <div class="sectionlbl">Reglas del juego</div>
+    <div class="orglist">
+      <div style="padding:14px"><span class="pill">+1</span> <span style="color:var(--muted);font-size:13px">si aciertas quién gana (o el empate).</span></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><span class="pill">+2</span> <span style="color:var(--muted);font-size:13px">extra si además clavas el marcador exacto (máximo <b style="color:var(--gold)">3</b> puntos por partido).</span></div>
+      <div style="padding:14px;border-top:1px solid var(--faint);color:var(--muted);font-size:13px">Cada partido cierra a pronósticos 1 minuto antes del pitazo inicial. El ranking se actualiza solo, apenas termina cada partido.</div>
+    </div>
+
     <div class="addbox" style="margin-top:22px">
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿Ya tienes un grupo? Escribe su ID para entrar directo:</div>
       <input class="input" id="landing_grupo_id" placeholder="ej: miempresa2026" style="margin-bottom:10px">
@@ -1756,6 +1819,7 @@ window.addEventListener("focus",refreshShared);
 let PC_masterHash=null;
 let PC_grupos=[];
 let PC_solicitudes=[];
+let PC_comentarios=[];
 
 function pcCard(inner){
   root.innerHTML=`<div style="max-width:520px;margin:40px auto;padding:0 14px">${inner}</div>`;
@@ -1783,6 +1847,8 @@ function bootPanelCentral(){
         PC_grupos=r.grupos||[];
         const rs=await edgeCall("admin-listar-solicitudes",{masterPin:hash});
         PC_solicitudes=(rs&&rs.status==="success")?(rs.solicitudes||[]):[];
+        const rc=await edgeCall("admin-listar-comentarios",{masterPin:hash});
+        PC_comentarios=(rc&&rc.status==="success")?(rc.comentarios||[]):[];
         renderPanelCentralMain();
       }else{
         err.textContent=(r&&r.message)||"No se pudo conectar.";
@@ -1846,6 +1912,23 @@ function renderPanelCentralMain(){
     </div>
   `:"";
 
+  // Comentarios del botón flotante -- mismo trato que solicitudes: solo se
+  // muestra si hay algo nuevo, y "Marcar como leído" lo saca de la lista.
+  const origenLabel={landing:"🌐 Home",jugador:"⚽ Jugador",organizador:"🔑 Organizador"};
+  const comentariosHtml=PC_comentarios.length?`
+    <div class="kicker" style="color:var(--mint);margin:22px 0 8px">Comentarios nuevos (${PC_comentarios.length})</div>
+    <div class="rules" style="border-color:rgba(87,230,150,.35);padding:0;overflow:hidden">
+      ${PC_comentarios.map((c,i)=>`
+      <div style="padding:14px${i?';border-top:1px solid var(--faint)':""}">
+        <div style="color:var(--muted);font-size:12px">
+          ${origenLabel[c.origen]||c.origen}${c.grupoId?" · grupo: "+escapeHtml(c.grupoId):""}${c.autorNombre?" · "+escapeHtml(c.autorNombre):""} · ${fmtFechaCorta(c.fecha)}
+        </div>
+        <div style="color:var(--line);font-size:14px;margin-top:4px;white-space:pre-wrap">${escapeHtml(c.mensaje)}</div>
+        <button class="link-btn pc-comentario-ok" data-id="${escapeHtml(c.id)}" style="color:var(--mint);margin-top:8px">✓ Marcar como leído</button>
+      </div>`).join("")}
+    </div>
+  `:"";
+
   pcCard(`
     <div class="kicker" style="color:var(--mint);margin-bottom:2px">PREDIGOLES</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -1854,11 +1937,25 @@ function renderPanelCentralMain(){
     </div>
     <div style="color:var(--muted);font-size:12.5px;margin-bottom:16px">${PC_grupos.length} grupo${PC_grupos.length===1?"":"s"} registrado${PC_grupos.length===1?"":"s"}</div>
     ${solicitudesHtml}
+    ${comentariosHtml}
     <button class="btn" id="pc_nuevo" style="margin-top:18px;margin-bottom:18px">➕ Crear grupo nuevo</button>
     ${filas}
   `);
   document.getElementById("pc_salir").onclick=()=>{PC_masterHash=null;bootPanelCentral();};
   document.getElementById("pc_nuevo").onclick=showCrearGrupo;
+  document.querySelectorAll(".pc-comentario-ok").forEach(btn=>{
+    btn.onclick=async()=>{
+      await conCargando(btn,async()=>{
+        const r=await edgeCall("admin-marcar-comentario-leido",{masterPin:PC_masterHash,comentarioId:btn.dataset.id});
+        if(r&&r.status==="success"){
+          PC_comentarios=PC_comentarios.filter(c=>c.id!==btn.dataset.id);
+          renderPanelCentralMain();
+        }else{
+          toast((r&&r.message)||"No se pudo actualizar.",true,3000);
+        }
+      },"...");
+    };
+  });
   document.querySelectorAll(".pc-solicitud-crear").forEach(btn=>{
     btn.onclick=async()=>{
       const s=PC_solicitudes.find(x=>x.id===btn.dataset.id);
@@ -2025,6 +2122,7 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
 (async function boot(){
   if(ES_PANEL_CENTRAL){ bootPanelCentral(); return; }
   if(ES_SETUP){ renderSetup(); return; }
+  initFeedbackButton();
   if(ES_LANDING){ renderLanding(); return; }
   try{
     S.allPreds={};
