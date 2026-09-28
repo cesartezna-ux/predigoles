@@ -222,13 +222,17 @@ const _qp=new URLSearchParams(location.search);
 // dejar que el fallback de abajo decida caso por caso.
 if(location.search===""){ location.replace("/?home=1"); }
 const ES_PANEL_CENTRAL=_qp.get("admin")==="central";
+// Formulario público post-compra (Gumroad enlaza aquí desde el recibo):
+// recolecta los datos que Panel Central necesita para crear el grupo, sin
+// exigir el PIN maestro -- el propio Edge Function valida cada campo.
+const ES_SETUP=!ES_PANEL_CENTRAL && _qp.get("setup")==="1";
 // Landing informativa: visita "en blanco" a predigoles.com, sin ?grupo=/?tab=
 // ni un grupo recordado de una visita anterior -- antes esto caía al grupo
 // por defecto ("fpc2026", que no existe) y mostraba "grupo no encontrado".
 // Ningún link existente (predigoles.com/?grupo=<id>) se ve afectado.
 // ?home=1 la fuerza siempre (la usa /home/, para tener una URL fija que
 // muestre la landing aunque el navegador ya tenga un grupo guardado).
-const ES_LANDING=!ES_PANEL_CENTRAL && (_qp.get("home")==="1" || (!_qp.get("grupo") && !_qp.get("tab") && !localStorage.getItem("pg_tab")));
+const ES_LANDING=!ES_PANEL_CENTRAL && !ES_SETUP && (_qp.get("home")==="1" || (!_qp.get("grupo") && !_qp.get("tab") && !localStorage.getItem("pg_tab")));
 const TAB=(_qp.get("grupo")||_qp.get("tab")||localStorage.getItem("pg_tab")||"fpc2026").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"fpc2026";
 localStorage.setItem("pg_tab",TAB);
 
@@ -1253,6 +1257,93 @@ function renderResultados(c){
 // rompe nada, solo se ve menos vistoso hasta que se agregue).
 const LANDING_BANDERAS={fpc_2026_2:"🇨🇴",la_liga_2026_27:"🇪🇸",champions_2026_27:"🏆",liga_mx_2026:"🇲🇽",liga_argentina_2026:"🇦🇷",nations_league_2026_27:"🇪🇺"};
 
+/* --- Formulario público de solicitud de grupo (predigoles.com/setup) ---
+   Cierra el hueco del flujo de venta: Gumroad no permite preguntas
+   personalizadas en el checkout, así que el comprador llega aquí desde el
+   mensaje del recibo y deja los datos que el administrador central
+   necesita para crear su grupo -- sin exponer el PIN maestro, el propio
+   Edge Function (solicitar-grupo) valida cada campo. */
+function renderSetup(){
+  const root=document.getElementById("root");
+  const torneoIds=Object.keys(TOURNAMENTS);
+  const torneoOptions=torneoIds.map(id=>`<option value="${id}" ${id===TOURNAMENT_DEFAULT?"selected":""}>${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
+  function listaEquiposHtml(torneoId){
+    const conf=TOURNAMENTS[torneoId]||{},flagsT=conf.FLAG||{},escudosT=conf.ESCUDOS||{};
+    const equipos=Object.keys(flagsT).sort();
+    return equipos.map(eq=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px">
+      <input type="checkbox" class="st_eq" value="${escapeHtml(eq)}"> <span class="eqcrest">${crestHtml(escudosT[eq],flagsT[eq]||"⚽")}</span>${escapeHtml(eq)}
+    </label>`).join("");
+  }
+  root.innerHTML=`
+    <div class="kicker">PREDIGOLES</div>
+    <h1>Activa <span class="yr">tu quiniela</span></h1>
+    <p class="sub">Ya compraste tu acceso — cuéntanos cómo quieres tu grupo y lo activamos.</p>
+    <div class="card" style="max-width:100%;margin-top:20px">
+      <label class="field">ID del grupo (para el link — solo letras, números, guiones)</label>
+      <input class="input" id="st_id" maxlength="40" placeholder="ej: mioficina2026">
+      <label class="field" style="margin-top:12px">Nombre del grupo</label>
+      <input class="input" id="st_nombre" maxlength="60" placeholder="Ej: Quiniela Oficina">
+      <label class="field" style="margin-top:12px">Torneo</label>
+      <select class="select-popup" id="st_torneo">${torneoOptions}</select>
+      <label class="field">¿Qué va a seguir este grupo?</label>
+      <label class="field" style="font-weight:400">
+        <input type="radio" name="st_modo" value="torneo" checked> &nbsp;El torneo completo
+      </label><br>
+      <label class="field" style="font-weight:400;margin-top:6px">
+        <input type="radio" name="st_modo" value="equipo"> &nbsp;Solo uno o varios equipos
+      </label>
+      <div id="st_equipos" style="margin-top:10px;max-height:180px;overflow-y:auto;display:none">${listaEquiposHtml(TOURNAMENT_DEFAULT)}</div>
+      <label class="field" style="margin-top:14px">Tu nombre (administrador del grupo)</label>
+      <input class="input" id="st_admin_nombre" maxlength="60" placeholder="Nombre de contacto">
+      <label class="field" style="margin-top:10px">Tu celular</label>
+      <input class="input" id="st_admin_cel" maxlength="20" placeholder="Ej: 3001234567">
+      <label class="field" style="margin-top:10px">Tu correo</label>
+      <input class="input" id="st_admin_correo" type="email" maxlength="60" placeholder="correo@ejemplo.com">
+      <label class="field" style="margin-top:10px">PIN que quieres usar (opcional — si lo dejas vacío, te asignamos uno)</label>
+      <input class="input" id="st_pin" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:20px;text-align:center">
+      <div id="st_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+      <button class="btn" id="st_enviar" style="margin-top:10px">Enviar solicitud</button>
+    </div>
+  `;
+  document.getElementById("st_torneo").onchange=(e)=>{
+    document.getElementById("st_equipos").innerHTML=listaEquiposHtml(e.target.value);
+  };
+  document.querySelectorAll('input[name="st_modo"]').forEach(r=>{
+    r.onchange=()=>{document.getElementById("st_equipos").style.display=r.value==="equipo"&&r.checked?"block":"none";};
+  });
+  document.getElementById("st_enviar").onclick=async()=>{
+    const err=document.getElementById("st_err");
+    const grupoId=document.getElementById("st_id").value.trim();
+    const nombreGrupo=document.getElementById("st_nombre").value.trim();
+    const torneoId=document.getElementById("st_torneo").value;
+    const modoSeguimiento=document.querySelector('input[name="st_modo"]:checked').value;
+    const equiposSeguidos=[...document.querySelectorAll(".st_eq:checked")].map(cb=>cb.value);
+    const nombreAdmin=document.getElementById("st_admin_nombre").value.trim();
+    const celularAdmin=document.getElementById("st_admin_cel").value.trim();
+    const correoAdmin=document.getElementById("st_admin_correo").value.trim();
+    const pinDeseado=document.getElementById("st_pin").value.trim();
+    if(!grupoId||!/^[a-zA-Z0-9_-]{1,40}$/.test(grupoId)){err.textContent="ID de grupo inválido (solo letras, números, guiones).";return;}
+    if(!nombreGrupo){err.textContent="Falta el nombre del grupo.";return;}
+    if(modoSeguimiento==="equipo"&&!equiposSeguidos.length){err.textContent="Elige al menos un equipo, o marca \"el torneo completo\".";return;}
+    if(!nombreAdmin){err.textContent="Falta tu nombre.";return;}
+    if(!celularAdmin){err.textContent="Falta tu celular.";return;}
+    if(!correoAdmin.includes("@")){err.textContent="Correo inválido.";return;}
+    if(pinDeseado&&!/^\d{4}$/.test(pinDeseado)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
+    await conCargando(document.getElementById("st_enviar"),async()=>{
+      const r=await edgeCall("solicitar-grupo",{grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pinDeseado});
+      if(r&&r.status==="success"){
+        root.innerHTML=`<div class="card" style="border-color:var(--mint);max-width:100%;margin-top:20px">
+          <div class="kicker" style="color:var(--mint)">Solicitud enviada ✓</div>
+          <h2>¡Listo, ${escapeHtml(nombreAdmin)}!</h2>
+          <p style="color:var(--muted);font-size:14px">En breve activamos tu grupo y te escribimos a <b style="color:var(--line)">${escapeHtml(correoAdmin)}</b> o <b style="color:var(--line)">${escapeHtml(celularAdmin)}</b> con el link y el PIN.</p>
+        </div>`;
+      }else{
+        err.textContent=(r&&r.message)||"No se pudo enviar. Intenta de nuevo.";
+      }
+    },"Enviando...");
+  };
+}
+
 function renderLanding(){
   const root=document.getElementById("root");
   const torneosChips=Object.entries(TOURNAMENTS).map(([id,t])=>`<span class="chip">${LANDING_BANDERAS[id]||"🏆"} ${escapeHtml(t.nombre)}</span>`).join("");
@@ -1664,6 +1755,7 @@ window.addEventListener("focus",refreshShared);
    los grupos nuevos — ya no existe autoconfiguración espontánea. */
 let PC_masterHash=null;
 let PC_grupos=[];
+let PC_solicitudes=[];
 
 function pcCard(inner){
   root.innerHTML=`<div style="max-width:520px;margin:40px auto;padding:0 14px">${inner}</div>`;
@@ -1689,6 +1781,8 @@ function bootPanelCentral(){
       if(r&&r.status==="success"){
         PC_masterHash=hash;
         PC_grupos=r.grupos||[];
+        const rs=await edgeCall("admin-listar-solicitudes",{masterPin:hash});
+        PC_solicitudes=(rs&&rs.status==="success")?(rs.solicitudes||[]):[];
         renderPanelCentralMain();
       }else{
         err.textContent=(r&&r.message)||"No se pudo conectar.";
@@ -1729,6 +1823,26 @@ function renderPanelCentralMain(){
       </div>
     </div>`).join(""):`<div class="empty" style="padding:30px 10px"><span class="big">📋</span>Todavía no hay grupos creados.</div>`;
 
+  // Solicitudes desde /setup (post-compra en Gumroad) -- solo se muestra la
+  // sección si hay algo pendiente, para no llenar el panel de vacío la
+  // mayor parte del tiempo.
+  const solicitudesHtml=PC_solicitudes.length?`
+    <div class="kicker" style="color:var(--gold);margin:22px 0 8px">Solicitudes pendientes (${PC_solicitudes.length})</div>
+    <div class="rules" style="border-color:rgba(255,200,69,.35);padding:0;overflow:hidden">
+      ${PC_solicitudes.map((s,i)=>`
+      <div style="padding:14px${i?';border-top:1px solid var(--faint)':""}">
+        <div style="font-weight:700;color:var(--line)">${escapeHtml(s.nombreGrupo)} <span style="color:var(--muted);font-weight:400">(${escapeHtml(s.grupoId)})</span></div>
+        <div style="color:var(--muted);font-size:12.5px;margin-top:4px">
+          Torneo: ${escapeHtml((TOURNAMENTS[s.torneoId]||{}).nombre||s.torneoId)} ·
+          ${s.modoSeguimiento==="equipo"?"Equipos: "+escapeHtml((s.equiposSeguidos||[]).join(", ")):"Todo el torneo"}<br>
+          Admin: ${escapeHtml(s.nombreAdmin)} · ${escapeHtml(s.celularAdmin)} · ${escapeHtml(s.correoAdmin)}<br>
+          PIN deseado: ${s.pinDeseado?escapeHtml(s.pinDeseado):"(sin preferencia)"} · Pedido: ${fmtFechaCorta(s.fechaSolicitud)}
+        </div>
+        <button class="link-btn pc-solicitud-ok" data-id="${escapeHtml(s.id)}" style="color:var(--mint);margin-top:8px">✓ Marcar como atendida</button>
+      </div>`).join("")}
+    </div>
+  `:"";
+
   pcCard(`
     <div class="kicker" style="color:var(--mint);margin-bottom:2px">PREDIGOLES</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -1736,11 +1850,25 @@ function renderPanelCentralMain(){
       <button class="link-btn" id="pc_salir">salir</button>
     </div>
     <div style="color:var(--muted);font-size:12.5px;margin-bottom:16px">${PC_grupos.length} grupo${PC_grupos.length===1?"":"s"} registrado${PC_grupos.length===1?"":"s"}</div>
-    <button class="btn" id="pc_nuevo" style="margin-bottom:18px">➕ Crear grupo nuevo</button>
+    ${solicitudesHtml}
+    <button class="btn" id="pc_nuevo" style="margin-top:18px;margin-bottom:18px">➕ Crear grupo nuevo</button>
     ${filas}
   `);
   document.getElementById("pc_salir").onclick=()=>{PC_masterHash=null;bootPanelCentral();};
   document.getElementById("pc_nuevo").onclick=showCrearGrupo;
+  document.querySelectorAll(".pc-solicitud-ok").forEach(btn=>{
+    btn.onclick=async()=>{
+      await conCargando(btn,async()=>{
+        const r=await edgeCall("admin-marcar-solicitud-atendida",{masterPin:PC_masterHash,solicitudId:btn.dataset.id});
+        if(r&&r.status==="success"){
+          PC_solicitudes=PC_solicitudes.filter(s=>s.id!==btn.dataset.id);
+          renderPanelCentralMain();
+        }else{
+          toast((r&&r.message)||"No se pudo actualizar.",true,3000);
+        }
+      },"...");
+    };
+  });
   document.querySelectorAll(".pc-reset").forEach(btn=>{
     btn.onclick=async()=>{
       if(!confirm(`¿Resetear el PIN de "${btn.dataset.nombre}"? El PIN anterior deja de funcionar de inmediato.`))return;
@@ -1871,6 +1999,7 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
 /* --- Boot --- */
 (async function boot(){
   if(ES_PANEL_CENTRAL){ bootPanelCentral(); return; }
+  if(ES_SETUP){ renderSetup(); return; }
   if(ES_LANDING){ renderLanding(); return; }
   try{
     S.allPreds={};
