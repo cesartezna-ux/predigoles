@@ -4,6 +4,7 @@ import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkMasterAuth } from "../_shared/auth.ts";
 import { sanitizeTab } from "../_shared/validate.ts";
 import { hashPin } from "../_shared/hashPin.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -33,10 +34,10 @@ Deno.serve(async (req: Request) => {
       group_id: idLimpio,
       admin_pin_hash: hashPin(pinFinal),
     });
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("admin-resetear-pin", error);
 
     return jsonOut({ status: "success", grupoId: idLimpio, pin: pinFinal });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("admin-resetear-pin", err);
   }
 });

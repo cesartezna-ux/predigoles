@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkAdminAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -27,6 +28,21 @@ Deno.serve(async (req: Request) => {
     const { tab, pin, matchId } = body;
     if (!tab) return jsonOut({ status: "error", message: "tab requerido." });
     if (!matchId) return jsonOut({ status: "error", message: "matchId requerido." });
+    // team_overrides es jsonb -- Postgres no valida su contenido, así que
+    // sin esto un "kick" con basura se guardaría tal cual y solo se
+    // descubriría después, como "Invalid Date" en el frontend.
+    if ("home" in body && (typeof body.home !== "string" || !body.home.trim() || body.home.length > 60)) {
+      return jsonOut({ status: "error", message: "Nombre de equipo (home) inválido." });
+    }
+    if ("away" in body && (typeof body.away !== "string" || !body.away.trim() || body.away.length > 60)) {
+      return jsonOut({ status: "error", message: "Nombre de equipo (away) inválido." });
+    }
+    if ("venue" in body && body.venue != null && (typeof body.venue !== "string" || body.venue.length > 120)) {
+      return jsonOut({ status: "error", message: "Sede inválida." });
+    }
+    if ("kick" in body && body.kick != null && isNaN(new Date(body.kick).getTime())) {
+      return jsonOut({ status: "error", message: "Fecha/hora inválida." });
+    }
 
     const db = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -60,10 +76,10 @@ Deno.serve(async (req: Request) => {
     overrides[matchId] = actual;
 
     const { error } = await db.from("groups").update({ team_overrides: overrides }).eq("id", tab);
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("guardar-ajuste-partido", error);
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("guardar-ajuste-partido", err);
   }
 });

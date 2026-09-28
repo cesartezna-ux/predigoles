@@ -15,6 +15,7 @@
 // fetch) y "grupo no existe" (el fetch funciona, pero no hay grupo).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -77,6 +78,6 @@ Deno.serve(async (req: Request) => {
       })),
     });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("estado-grupo", err);
   }
 });

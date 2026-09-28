@@ -8,6 +8,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkPlayerAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
+
+// Mismo rango que clampVal() en el frontend (0-49) -- se repite aquí porque
+// un llamado directo a la API se salta cualquier límite que solo viva en
+// el cliente. home_score/away_score son "int" sin CHECK en Postgres, así
+// que sin esto se podría guardar un marcador negativo o absurdamente
+// grande y dañar el ranking de todo el grupo.
+function marcadorValido(v: unknown): boolean {
+  return v === null || v === undefined || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 49);
+}
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -18,6 +28,9 @@ Deno.serve(async (req: Request) => {
     if (!tab) return jsonOut({ status: "error", message: "tab requerido." });
     if (!playerId) return jsonOut({ status: "error", message: "playerId requerido." });
     if (!matchId) return jsonOut({ status: "error", message: "matchId requerido." });
+    if (!marcadorValido(homeScore) || !marcadorValido(awayScore)) {
+      return jsonOut({ status: "error", message: "El marcador debe ser un número entero entre 0 y 49." });
+    }
 
     const db = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -35,10 +48,10 @@ Deno.serve(async (req: Request) => {
       away_score: awayScore ?? null,
       updated_at: new Date().toISOString(),
     });
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("guardar-pronostico", error);
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("guardar-pronostico", err);
   }
 });

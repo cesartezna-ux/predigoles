@@ -4,6 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkMasterAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -24,7 +25,7 @@ Deno.serve(async (req: Request) => {
       .select("id, grupo_id, nombre_grupo, torneo_id, modo_seguimiento, equipos_seguidos, nombre_admin, celular_admin, correo_admin, pin_deseado, created_at")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true });
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("admin-listar-solicitudes", error);
 
     return jsonOut({
       status: "success",
@@ -43,6 +44,6 @@ Deno.serve(async (req: Request) => {
       })),
     });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("admin-listar-solicitudes", err);
   }
 });

@@ -4,6 +4,7 @@
 // nota de diseño en login-jugador/index.ts).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -12,8 +13,14 @@ Deno.serve(async (req: Request) => {
   try {
     const { tab, player } = await req.json();
     if (!tab) return jsonOut({ status: "error", message: "tab requerido." });
-    if (!player?.id || !player?.name) {
-      return jsonOut({ status: "error", message: "player inválido." });
+    if (typeof player?.id !== "string" || !player.id.trim() || player.id.length > 60) {
+      return jsonOut({ status: "error", message: "player.id inválido." });
+    }
+    if (typeof player?.name !== "string" || !player.name.trim() || player.name.length > 40) {
+      return jsonOut({ status: "error", message: "player.name inválido." });
+    }
+    if (player.ico != null && (typeof player.ico !== "string" || player.ico.length > 8)) {
+      return jsonOut({ status: "error", message: "player.ico inválido." });
     }
 
     const db = createClient(
@@ -35,7 +42,7 @@ Deno.serve(async (req: Request) => {
         .update({ name: player.name, ico: player.ico ?? null })
         .eq("group_id", tab)
         .eq("id", player.id);
-      if (error) return jsonOut({ status: "error", message: String(error.message) });
+      if (error) return errOut("join-grupo", error);
     } else {
       const { error } = await db
         .from("players")
@@ -48,13 +55,13 @@ Deno.serve(async (req: Request) => {
           const { data: roster } = await db.from("players").select("id, name, ico").eq("group_id", tab);
           return jsonOut({ status: "name_taken", roster: roster ?? [] });
         }
-        return jsonOut({ status: "error", message: String(error.message) });
+        return errOut("join-grupo", error);
       }
     }
 
     const { data: roster } = await db.from("players").select("id, name, ico").eq("group_id", tab);
     return jsonOut({ status: "success", roster: roster ?? [] });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("join-grupo", err);
   }
 });

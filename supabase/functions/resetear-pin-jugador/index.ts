@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkAdminAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -30,13 +31,13 @@ Deno.serve(async (req: Request) => {
       .eq("group_id", tab)
       .eq("id", playerId)
       .select("id");
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("resetear-pin-jugador", error);
     if (!data || data.length === 0) {
       return jsonOut({ status: "error", message: "Jugador no encontrado en este grupo." });
     }
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("resetear-pin-jugador", err);
   }
 });

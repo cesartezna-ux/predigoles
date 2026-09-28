@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { rateLimitCheck, rateLimitRegistrarFallo, rateLimitRegistrarExito } from "../_shared/rateLimit.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -59,7 +60,7 @@ Deno.serve(async (req: Request) => {
         .update({ pin_hash: pinEnviado })
         .eq("group_id", tab)
         .eq("id", playerId);
-      if (error) return jsonOut({ status: "error", message: String(error.message) });
+      if (error) return errOut("login-jugador", error);
       await rateLimitRegistrarExito(db, identidad);
       return jsonOut({ status: "success", nuevo: true });
     }
@@ -72,6 +73,6 @@ Deno.serve(async (req: Request) => {
     await rateLimitRegistrarExito(db, identidad);
     return jsonOut({ status: "success", nuevo: false });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("login-jugador", err);
   }
 });

@@ -9,6 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkAdminAuth } from "../_shared/auth.ts";
 import { hashPin } from "../_shared/hashPin.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -18,7 +19,7 @@ Deno.serve(async (req: Request) => {
     const { tab, pin, nombreGrupo, pinNuevo } = await req.json();
     if (!tab) return jsonOut({ status: "error", message: "tab requerido." });
 
-    const nombre = String(nombreGrupo || "").trim();
+    const nombre = String(nombreGrupo || "").trim().slice(0, 80);
     if (!nombre) return jsonOut({ status: "error", message: "El nombre del grupo no puede quedar vacío." });
 
     const pinNuevoLimpio = pinNuevo ? String(pinNuevo).trim() : "";
@@ -35,7 +36,7 @@ Deno.serve(async (req: Request) => {
     if (authError) return jsonOut(authError);
 
     const { error: errNombre } = await db.from("groups").update({ name: nombre }).eq("id", tab);
-    if (errNombre) return jsonOut({ status: "error", message: String(errNombre.message) });
+    if (errNombre) return errOut("guardar-config-grupo", errNombre);
 
     let nuevoHash: string | null = null;
     if (pinNuevoLimpio) {
@@ -44,11 +45,11 @@ Deno.serve(async (req: Request) => {
         .from("group_secrets")
         .update({ admin_pin_hash: nuevoHash })
         .eq("group_id", tab);
-      if (errPin) return jsonOut({ status: "error", message: String(errPin.message) });
+      if (errPin) return errOut("guardar-config-grupo", errPin);
     }
 
     return jsonOut({ status: "success", nuevoPinHash: nuevoHash });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("guardar-config-grupo", err);
   }
 });

@@ -5,6 +5,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkAdminAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -23,6 +24,6 @@ Deno.serve(async (req: Request) => {
     if (authError) return jsonOut(authError);
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("login-organizador", err);
   }
 });

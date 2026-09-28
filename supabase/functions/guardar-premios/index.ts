@@ -4,6 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkAdminAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -44,10 +45,10 @@ Deno.serve(async (req: Request) => {
     const betting = { inscripcion: inscripcionNum, premios: { p1, p2, p3 } };
 
     const { error } = await db.from("groups").update({ betting }).eq("id", tab);
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("guardar-premios", error);
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("guardar-premios", err);
   }
 });

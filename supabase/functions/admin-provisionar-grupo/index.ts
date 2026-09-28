@@ -6,6 +6,7 @@ import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkMasterAuth } from "../_shared/auth.ts";
 import { sanitizeTab } from "../_shared/validate.ts";
 import { hashPin } from "../_shared/hashPin.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -63,16 +64,16 @@ Deno.serve(async (req: Request) => {
       admin_correo: correoAdmin || null,
       estado_pago: estadoPago || "Pendiente",
     });
-    if (errGrupo) return jsonOut({ status: "error", message: String(errGrupo.message) });
+    if (errGrupo) return errOut("admin-provisionar-grupo", errGrupo);
 
     const { error: errSecret } = await db.from("group_secrets").upsert({
       group_id: idLimpio,
       admin_pin_hash: hashPin(pinFinal),
     });
-    if (errSecret) return jsonOut({ status: "error", message: String(errSecret.message) });
+    if (errSecret) return errOut("admin-provisionar-grupo", errSecret);
 
     return jsonOut({ status: "success", grupoId: idLimpio, pin: pinFinal });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("admin-provisionar-grupo", err);
   }
 });

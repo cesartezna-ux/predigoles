@@ -11,6 +11,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkAdminAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
+
+// Mismo límite que guardar-pronostico -- home_score/away_score son "int"
+// sin CHECK en Postgres, así que sin esto un llamado directo a la API
+// podría guardar un marcador negativo o absurdo.
+function marcadorValido(v: unknown): boolean {
+  return v === null || v === undefined || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 49);
+}
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -20,6 +28,9 @@ Deno.serve(async (req: Request) => {
     const { tab, matchId, homeScore, awayScore, pin } = await req.json();
     if (!tab) return jsonOut({ status: "error", message: "tab requerido." });
     if (!matchId) return jsonOut({ status: "error", message: "matchId requerido." });
+    if (!marcadorValido(homeScore) || !marcadorValido(awayScore)) {
+      return jsonOut({ status: "error", message: "El marcador debe ser un número entero entre 0 y 49." });
+    }
 
     const db = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -38,13 +49,13 @@ Deno.serve(async (req: Request) => {
       .eq("id", matchId)
       .eq("group_id", tab)
       .select("id");
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("guardar-resultado-personalizado", error);
     if (!data || data.length === 0) {
       return jsonOut({ status: "error", message: "Partido personalizado no encontrado en este grupo." });
     }
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("guardar-resultado-personalizado", err);
   }
 });

@@ -14,6 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkMasterAuth } from "../_shared/auth.ts";
 import { traducirEquipo } from "../_shared/teamDict.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 const APIFOOTBALL_BASE = "https://v3.football.api-sports.io";
 
@@ -89,21 +90,21 @@ Deno.serve(async (req: Request) => {
     // fusión), para que un partido que desaparezca de la API (cancelado,
     // reprogramado con otro id) no quede como reliquia.
     const { error: delErr } = await db.from("fixtures").delete().eq("torneo_id", torneoId);
-    if (delErr) return jsonOut({ status: "error", message: String(delErr.message) });
+    if (delErr) return errOut("cargar-fixture", delErr);
 
     const { error: insErr } = await db.from("fixtures").insert(fixturesRows);
-    if (insErr) return jsonOut({ status: "error", message: String(insErr.message) });
+    if (insErr) return errOut("cargar-fixture", insErr);
 
     const crestRows = [...crestsMap.entries()].map(([team_name, crest_url]) => ({
       torneo_id: torneoId, team_name, crest_url,
     }));
     if (crestRows.length) {
       const { error: crestErr } = await db.from("team_crests").upsert(crestRows, { onConflict: "torneo_id,team_name" });
-      if (crestErr) return jsonOut({ status: "error", message: String(crestErr.message) });
+      if (crestErr) return errOut("cargar-fixture", crestErr);
     }
 
     return jsonOut({ status: "success", partidos: fixturesRows.length, escudos: crestRows.length });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("cargar-fixture", err);
   }
 });

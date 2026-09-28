@@ -8,6 +8,7 @@ import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { sanitizeTab } from "../_shared/validate.ts";
 import { rateLimitCheck, rateLimitRegistrarFallo } from "../_shared/rateLimit.ts";
 import { TORNEOS_SYNC } from "../_shared/torneosSync.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 function limpiarTexto(v: unknown, max: number): string {
   return String(v ?? "").trim().slice(0, max);
@@ -87,10 +88,10 @@ Deno.serve(async (req: Request) => {
       correo_admin: correoAdmin,
       pin_deseado: pinDeseado,
     });
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("solicitar-grupo", error);
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("solicitar-grupo", err);
   }
 });

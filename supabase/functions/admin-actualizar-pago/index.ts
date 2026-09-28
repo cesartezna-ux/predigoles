@@ -2,6 +2,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkMasterAuth } from "../_shared/auth.ts";
+import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
   const optionsResp = handleOptions(req);
@@ -18,19 +19,22 @@ Deno.serve(async (req: Request) => {
     if (authErr) return jsonOut(authErr);
 
     if (!grupoId || !estadoPago) return jsonOut({ status: "error", message: "Faltan datos." });
+    if (!["Pendiente", "Pagado", "Cortesía"].includes(String(estadoPago))) {
+      return jsonOut({ status: "error", message: "Estado de pago inválido." });
+    }
 
     const { data, error } = await db
       .from("groups")
       .update({ estado_pago: String(estadoPago) })
       .eq("id", String(grupoId))
       .select("id");
-    if (error) return jsonOut({ status: "error", message: String(error.message) });
+    if (error) return errOut("admin-actualizar-pago", error);
     if (!data || data.length === 0) {
       return jsonOut({ status: "error", message: "Grupo no encontrado en el registro maestro." });
     }
 
     return jsonOut({ status: "success" });
   } catch (err) {
-    return jsonOut({ status: "error", message: String(err) });
+    return errOut("admin-actualizar-pago", err);
   }
 });
