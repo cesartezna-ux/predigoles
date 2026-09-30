@@ -1601,7 +1601,7 @@ async function showOnboarding(isChange){
     document.getElementById("forgotBtn").onclick=()=>{
       ov.innerHTML=`<div class="card">
         <h2 style="font-size:20px">PIN olvidado</h2>
-        <p style="color:var(--muted);font-size:13px">Contacta al organizador para resetearlo.</p>
+        <p style="color:var(--muted);font-size:13px">Pídele a quien administra <b style="color:var(--line)">${escapeHtml(S.groupName||"este grupo")}</b> que te resetee el PIN desde el modo Organizador — te va a entregar uno nuevo directamente.</p>
         <button class="btn ghost" id="backBtn2" style="margin-top:16px">← Volver</button>
       </div>`;
       document.getElementById("backBtn2").onclick=()=>renderPinScreen(player);
@@ -1728,13 +1728,38 @@ async function showPinReset(){
       await conCargando(btn,async()=>{
         const r=await edgeCall("resetear-pin-jugador",{playerId:pl.id,pin:S.organizerPinHash});
         if(r&&r.status==="success"){
-          ov.remove();toast(`PIN de ${pl.name} reseteado.`,false,5000);
+          mostrarPinJugadorReseteado(pl.name,r.pin);
         } else {
           toast((r&&r.message)||"No se pudo resetear el PIN.",true,4000);
         }
       },"Reseteando...");
     };
   });
+}
+
+// El PIN nuevo se genera de una vez (no se deja en blanco para que "el
+// primero que entre" lo reclame) -- eso cerraba una ventana real donde
+// cualquiera con acceso al roster podía robarse la cuenta antes que el
+// jugador legítimo. El organizador se lo entrega él mismo, como ya hace
+// con el link+PIN al crear un grupo.
+function mostrarPinJugadorReseteado(nombreJugador,pin){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card" style="border-color:var(--mint)">
+    <div class="kicker" style="color:var(--mint)">PIN reseteado ✓</div>
+    <h2>${escapeHtml(nombreJugador)}</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Entrégaselo directo a ${escapeHtml(nombreJugador)} — es la única vez que se muestra en texto plano.</p>
+    <label class="field">PIN nuevo</label>
+    <input class="input" id="pjr_pin" readonly value="${escapeHtml(pin)}" style="letter-spacing:.3em;font-size:22px;text-align:center;color:var(--gold)">
+    <button class="btn" id="pjr_copiar" style="margin-top:14px">📋 Copiar PIN</button>
+    <button class="btn ghost" id="pjr_cerrar" style="margin-top:10px">Cerrar</button>
+  </div>`;
+  document.getElementById("pjr_copiar").onclick=()=>{
+    navigator.clipboard.writeText(pin);
+    toast("Copiado ✓",false,2000);
+  };
+  document.getElementById("pjr_cerrar").onclick=()=>ov.remove();
 }
 
 /* --- Tick --- */
