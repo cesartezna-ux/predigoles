@@ -1,0 +1,29 @@
+/* Hoja de estilo compartida por /terminos y /privacidad -- páginas de
+   solo texto, sin dependencia del JS de index.html (no necesitan
+   TOURNAMENTS, Supabase ni ningún estado dinámico), pero con la misma
+   paleta/tipografía del resto del sitio para que se sientan parte de
+   Predigoles y no una página aparte. */
+:root{
+  --pitch:#0a1c15; --panel:#0f2a20; --panel2:#123524;
+  --line:#eaf3ec; --muted:#83a294; --faint:rgba(234,243,236,.10);
+  --gold:#ffc845; --mint:#36e0bf;
+  --display:'Anton',sans-serif; --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--body);color:var(--line);background:var(--pitch);-webkit-font-smoothing:antialiased;min-height:100vh}
+.wrap{max-width:640px;margin:0 auto;padding:40px 16px 80px}
+a{color:var(--mint)}
+.back{display:inline-block;margin-bottom:24px;color:var(--muted);font-size:13px;text-decoration:none}
+.back:hover{color:var(--mint)}
+.kicker{font:600 11px/1 var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--mint);margin-bottom:8px}
+h1{font-family:var(--display);text-transform:uppercase;font-size:clamp(26px,6vw,36px);margin:0 0 4px;line-height:1.05}
+.updated{color:var(--muted);font-size:13px;margin-bottom:28px}
+h2{font-size:17px;margin:28px 0 8px;color:var(--gold)}
+p,li{color:var(--muted);font-size:14.5px;line-height:1.7}
+ul{padding-left:20px;margin:8px 0}
+strong,b{color:var(--line)}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+td,th{border:1px solid var(--faint);padding:8px 10px;text-align:left;color:var(--muted)}
+th{color:var(--line)}
+.crosslink{margin-top:36px;padding-top:20px;border-top:1px solid var(--faint);font-size:13px;color:var(--muted)}
