@@ -414,6 +414,50 @@ const TOURNAMENTS={
     },
     ESCUDOS:{},
     EXTRA_ALLOWED:[]
+  },
+  "mls_2026":{
+    nombre:"MLS 2026",
+    kicker:"MLS · Estados Unidos",
+    h1a:"Rumbo al ",h1b:"Título",
+    subtitulo:"Acierta el resultado y clava el marcador en el fútbol de Estados Unidos.",
+    // Liga 253, temporada 2026 (confirmado contra dashboard.api-football.com/soccer/ids,
+    // season actual sin dividir en fases). Nombres confirmados contra la malla
+    // real ya cargada (team_crests) -- varios difieren de su nombre "oficial"
+    // (ej. api-football usa "Austin", no "Austin FC"; "DC United", no "D.C. United").
+    FLAG:{
+      "Atlanta United FC":"⚽","Austin":"⚽","CF Montreal":"⚽","Charlotte":"⚽",
+      "Chicago Fire":"⚽","Colorado Rapids":"⚽","Columbus Crew":"⚽","DC United":"⚽",
+      "FC Cincinnati":"⚽","FC Dallas":"⚽","Houston Dynamo":"⚽","Inter Miami":"⚽",
+      "Los Angeles FC":"⚽","Los Angeles Galaxy":"⚽","Minnesota United FC":"⚽","Nashville SC":"⚽",
+      "New England Revolution":"⚽","New York City FC":"⚽","New York Red Bulls":"⚽",
+      "Orlando City SC":"⚽","Philadelphia Union":"⚽","Portland Timbers":"⚽",
+      "Real Salt Lake":"⚽","San Diego":"⚽","San Jose Earthquakes":"⚽",
+      "Seattle Sounders":"⚽","Sporting Kansas City":"⚽","St. Louis City":"⚽",
+      "Toronto FC":"⚽","Vancouver Whitecaps":"⚽"
+    },
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[]
+  },
+  "brasileirao_2026":{
+    nombre:"Brasileirão Série A 2026",
+    kicker:"Brasileirão · Brasil",
+    h1a:"Rumbo al ",h1b:"Título",
+    subtitulo:"Acierta el resultado y clava el marcador en el fútbol brasileño.",
+    // Liga 71, temporada 2026 (confirmado contra dashboard.api-football.com/soccer/ids).
+    // Nombres confirmados contra la malla real ya cargada (team_crests) --
+    // incluye los 4 ascendidos de la Série B 2025 (Coritiba, Atletico
+    // Paranaense, Chapecoense, Remo). Varios nombres vienen sin tilde o
+    // abreviados tal como los devuelve api-football (ej. "RB Bragantino",
+    // "Atletico-MG" para Atlético Mineiro).
+    FLAG:{
+      "Atletico Paranaense":"⚽","Atletico-MG":"⚽","Bahia":"⚽","Botafogo":"⚽",
+      "Chapecoense-sc":"⚽","Corinthians":"⚽","Coritiba":"⚽","Cruzeiro":"⚽",
+      "Flamengo":"⚽","Fluminense":"⚽","Gremio":"⚽","Internacional de Bogotá":"⚽",
+      "Mirassol":"⚽","Palmeiras":"⚽","RB Bragantino":"⚽","Remo":"⚽",
+      "Santos":"⚽","Sao Paulo":"⚽","Vasco DA Gama":"⚽","Vitoria":"⚽"
+    },
+    ESCUDOS:{},
+    EXTRA_ALLOWED:[]
   }
   // Próximo torneo se agrega como otra entrada aquí, con su propio FLAG/ESCUDOS
   // — sin tocar nada más del archivo. Su malla se carga igual, corriendo la
@@ -1331,7 +1375,7 @@ function renderResultados(c){
 // Bandera decorativa por torneo -- solo para la fila de "torneos cubiertos"
 // de la landing; si se agrega un torneo nuevo y no está aquí, cae a 🏆 (no
 // rompe nada, solo se ve menos vistoso hasta que se agregue).
-const LANDING_BANDERAS={fpc_2026_2:"🇨🇴",la_liga_2026_27:"🇪🇸",champions_2026_27:"🏆",liga_mx_2026:"🇲🇽",liga_argentina_2026:"🇦🇷",nations_league_2026_27:"🇪🇺"};
+const LANDING_BANDERAS={fpc_2026_2:"🇨🇴",la_liga_2026_27:"🇪🇸",champions_2026_27:"🏆",liga_mx_2026:"🇲🇽",liga_argentina_2026:"🇦🇷",nations_league_2026_27:"🇪🇺",mls_2026:"🇺🇸",brasileirao_2026:"🇧🇷"};
 
 /* --- Formulario público de solicitud de grupo (predigoles.com/setup) ---
    Cierra el hueco del flujo de venta: Gumroad no permite preguntas

@@ -8,4 +8,6 @@ export const TORNEOS_SYNC: Record<string, { leagueId: number; season: number }> 
   liga_mx_2026: { leagueId: 262, season: 2026 }, // Apertura 2026 -- este season ya viene acotado, sin Clausura mezclada
   liga_argentina_2026: { leagueId: 128, season: 2026 }, // Apertura+Clausura juntos -- cargar-fixture ya filtró solo Clausura (fase en curso)
   nations_league_2026_27: { leagueId: 5, season: 2026 }, // UEFA Nations League, arrancó 24/09/2026
+  mls_2026: { leagueId: 253, season: 2026 }, // MLS -- confirmado contra dashboard.api-football.com/soccer/ids
+  brasileirao_2026: { leagueId: 71, season: 2026 }, // Brasileirão Série A -- confirmado contra dashboard.api-football.com/soccer/ids
 };
