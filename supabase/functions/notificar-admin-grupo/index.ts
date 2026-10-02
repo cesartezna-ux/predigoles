@@ -65,9 +65,7 @@ Tu quiniela "${nombre}" ya está lista en Predigoles.
 Link de tu grupo: ${link}
 Tu PIN de administrador: ${pinLimpio}
 
-Para entrar como organizador: abre el link, toca el botón "Organizador" (abajo de la pantalla) e ingresa tu PIN.
-
-Desde ahí puedes invitar a tus jugadores compartiendo el mismo link, configurar premios, y ver el ranking en tiempo real.
+Para entrar como organizador: abre el link, toca el botón "Organizador" (abajo de la pantalla) e ingresa tu PIN. Ahí mismo, en el menú, encuentras "Cómo usar Predigoles" con la guía completa (invitar jugadores, reglas del juego, premios, y más).
 
 Guarda este correo -- es la única vez que se envía el PIN en texto plano.`);
 
@@ -76,8 +74,7 @@ Guarda este correo -- es la única vez que se envía el PIN en texto plano.`);
       <p>Tu quiniela <b>${nombre}</b> ya está lista en Predigoles.</p>
       <p><b>Link de tu grupo:</b><br><a href="${link}">${link}</a></p>
       <p><b>Tu PIN de administrador:</b><br><span style="font-size:22px;letter-spacing:4px;font-weight:bold">${pinLimpio}</span></p>
-      <p>Para entrar como organizador: abre el link, toca el botón <b>"Organizador"</b> (abajo de la pantalla) e ingresa tu PIN.</p>
-      <p>Desde ahí puedes invitar a tus jugadores compartiendo el mismo link, configurar premios, y ver el ranking en tiempo real.</p>
+      <p>Para entrar como organizador: abre el link, toca el botón <b>"Organizador"</b> (abajo de la pantalla) e ingresa tu PIN. Ahí mismo, en el menú, encuentras <b>"Cómo usar Predigoles"</b> con la guía completa (invitar jugadores, reglas del juego, premios, y más).</p>
       <p style="color:#888;font-size:12px">Guarda este correo — es la única vez que se envía el PIN en texto plano.</p>
     </div>`);
 

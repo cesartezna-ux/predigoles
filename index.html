@@ -1352,6 +1352,15 @@ function renderResultados(c){
       </button>
     </div>
 
+    <div class="sectionlbl">Ayuda</div>
+    <div class="orglist">
+      <button class="orgrow" id="rs_comousar">
+        <div class="orgico" style="background:rgba(54,224,191,.15);color:var(--mint)">❓</div>
+        <div class="lbl">Cómo usar Predigoles</div>
+        <div class="chev">›</div>
+      </button>
+    </div>
+
     <div class="exitzone">
       <button class="exitbtn" id="rs_salir">
         <div class="orgico" style="background:var(--faint);color:var(--line)">🚪</div>
@@ -1366,6 +1375,46 @@ function renderResultados(c){
   document.getElementById("rs_seguimiento").onclick=showModoSeguimiento;
   document.getElementById("rs_premios").onclick=showBettingConfig;
   document.getElementById("rs_pinjugador").onclick=showPinReset;
+  document.getElementById("rs_comousar").onclick=showComoUsar;
+}
+
+// Vive detrás del PIN de organizador a propósito (ver conversación con el
+// admin): así el correo de bienvenida puede quedarse corto -- un link a
+// este mismo panel en vez de instrucciones completas pegadas en el cuerpo
+// del correo -- y la guía se puede seguir mejorando sin que los correos ya
+// enviados queden con una versión vieja y desactualizada.
+function showComoUsar(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+    <div class="kicker" style="color:var(--mint)">Modo Organizador</div>
+    <h2>Cómo usar Predigoles</h2>
+
+    <div class="sectionlbl">Invita a tus jugadores</div>
+    <div class="orglist"><div style="padding:14px;color:var(--muted);font-size:13px">Comparte el mismo link de tu grupo (el que recibiste por correo) — cada persona crea su propio ícono y PIN la primera vez que entra. No hace falta ningún registro ni correo de cada jugador.</div></div>
+
+    <div class="sectionlbl">Reglas del juego</div>
+    <div class="orglist">
+      <div style="padding:14px"><span class="pill">+1</span> <span style="color:var(--muted);font-size:13px">si aciertas quién gana (o el empate).</span></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><span class="pill">+2</span> <span style="color:var(--muted);font-size:13px">extra si además clavas el marcador exacto (máximo <b style="color:var(--gold)">3</b> puntos por partido).</span></div>
+      <div style="padding:14px;border-top:1px solid var(--faint);color:var(--muted);font-size:13px">Cada partido cierra a pronósticos 1 minuto antes del pitazo inicial. Los resultados y el ranking se actualizan solos — nadie tiene que cargarlos a mano.</div>
+    </div>
+
+    <div class="sectionlbl">Lo que puedes configurar aquí</div>
+    <div class="orglist">
+      <div style="padding:14px"><b style="color:var(--line)">✏️ Nombre y PIN del grupo</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Cambia el nombre que ven los jugadores, o tu propio PIN de administrador.</div></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">⚽ Qué equipo(s) seguir</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Sigue el torneo completo, o filtra a solo los partidos de uno o varios equipos.</div></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">🏆 Premio del grupo</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Define cómo se reparte el premio (1°, 2°, 3° puesto) — Predigoles nunca recauda ni mueve dinero, solo lo muestra.</div></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">🔑 Restablecer PIN de un jugador</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Si un jugador olvida su PIN, lo reseteas aquí y se lo entregas tú mismo.</div></div>
+    </div>
+
+    <div class="sectionlbl">¿Dudas?</div>
+    <div class="orglist"><div style="padding:14px;color:var(--muted);font-size:13px">Escríbenos a <a href="mailto:contacto@predigoles.com" style="color:var(--mint)">contacto@predigoles.com</a>.</div></div>
+
+    <button class="btn ghost" id="cu_cerrar" style="margin-top:18px">Cerrar</button>
+  </div>`;
+  document.getElementById("cu_cerrar").onclick=()=>ov.remove();
 }
 /* --- Setup inicial --- */
 /* --- Landing informativa (predigoles.com sin ?grupo=) ---
