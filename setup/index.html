@@ -3,9 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <!-- URL fija para el link del recibo de Gumroad -- redirige al formulario
-     real (renderSetup en index.html), mismo patrón que /home y /comprar. -->
-<meta http-equiv="refresh" content="0; url=/?setup=1">
-<script>location.replace("/?setup=1");</script>
+     real (renderSetup en index.html), mismo patrón que /home y /comprar.
+     Sin <meta refresh> a propósito: una URL estática le ganaría la carrera
+     al script de abajo y borraría los parámetros que Wompi agrega al volver
+     del checkout (ver crear-pago-wompi) -- toda la app ya requiere JS, así
+     que no hace falta ese respaldo. -->
+<script>
+  var qs=location.search.replace(/^\?/,"");
+  location.replace("/?setup=1"+(qs?"&"+qs:""));
+</script>
 <title>Predigoles</title>
 </head>
 <body></body>

@@ -32,7 +32,12 @@ Deno.serve(async (req: Request) => {
     const integritySecret = Deno.env.get("WOMPI_INTEGRITY_SECRET") || "";
     const currency = Deno.env.get("WOMPI_CURRENCY") || "";
     const amountInCents = Number(Deno.env.get("WOMPI_AMOUNT_CENTS") || "0");
-    const redirectUrl = Deno.env.get("WOMPI_REDIRECT_URL") || "https://www.predigoles.com/setup";
+    // Se le agrega "pago=1" a la URL de retorno (propia o la que Wompi
+    // agregue encima no importa) -- así renderSetup() en el frontend sabe,
+    // sin adivinar el formato de los parámetros de Wompi, que debe mostrar
+    // la pantalla de agradecimiento en vez del formulario vacío.
+    const redirectBase = Deno.env.get("WOMPI_REDIRECT_URL") || "https://www.predigoles.com/setup";
+    const redirectUrl = redirectBase + (redirectBase.includes("?") ? "&" : "?") + "pago=1";
     if (!publicKey || !integritySecret || !currency || !amountInCents) {
       return jsonOut({ status: "error", message: "La pasarela de pago todavía no está configurada. Intenta de nuevo más tarde." });
     }

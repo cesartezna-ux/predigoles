@@ -1385,6 +1385,20 @@ const LANDING_BANDERAS={fpc_2026_2:"🇨🇴",la_liga_2026_27:"🇪🇸",champio
    Edge Function (solicitar-grupo) valida cada campo. */
 function renderSetup(){
   const root=document.getElementById("root");
+  // Vuelta del checkout de Wompi (ver crear-pago-wompi, que le agrega
+  // "pago=1" a la redirect-url): nunca se vuelve a mostrar el formulario
+  // vacío en esta visita -- el webhook ya está procesando el pago por su
+  // cuenta, aquí solo se confirma al comprador que se recibió.
+  if(new URLSearchParams(location.search).get("pago")==="1"){
+    root.innerHTML=`
+      <div class="kicker">PREDIGOLES</div>
+      <div class="card" style="border-color:var(--mint);max-width:100%;margin-top:20px">
+        <div class="kicker" style="color:var(--mint)">Pago recibido ✓</div>
+        <h2>¡Gracias por tu compra!</h2>
+        <p style="color:var(--muted);font-size:14px">Ya recibimos tu pago. En breve activamos tu grupo y te escribimos con el link y el PIN.</p>
+      </div>`;
+    return;
+  }
   const torneoIds=Object.keys(TOURNAMENTS);
   const torneoOptions=torneoIds.map(id=>`<option value="${id}" ${id===TOURNAMENT_DEFAULT?"selected":""}>${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
   function listaEquiposHtml(torneoId){
@@ -1496,8 +1510,8 @@ function renderLanding(){
 
       <div id="landing_live"></div>
 
-      <a class="btn" href="/comprar" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
-      <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$15 USD · pago único por grupo, sin cobros por jugador</div>
+      <a class="btn" href="/setup" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+      <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$30.000 COP · pago único por grupo, sin cobros por jugador</div>
     </div>
 
     <div class="rules" style="margin-top:22px">
@@ -1604,7 +1618,7 @@ function showGrupoNoEncontrado(){
     <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Si crees que esto es un error, contacta a quien te compartió el link.</p>
     <div class="addbox" style="margin:0">
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿No tienes aún creada tu quiniela?</div>
-      <a class="smallbtn full" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/comprar" target="_blank" rel="noopener">🚀 Cómprala aquí</a>
+      <a class="smallbtn full" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/setup" target="_blank" rel="noopener">🚀 Cómprala aquí</a>
     </div>
   </div>`;
 }
