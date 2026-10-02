@@ -32,12 +32,7 @@ Deno.serve(async (req: Request) => {
     const integritySecret = Deno.env.get("WOMPI_INTEGRITY_SECRET") || "";
     const currency = Deno.env.get("WOMPI_CURRENCY") || "";
     const amountInCents = Number(Deno.env.get("WOMPI_AMOUNT_CENTS") || "0");
-    // Se le agrega "pago=1" a la URL de retorno (propia o la que Wompi
-    // agregue encima no importa) -- así renderSetup() en el frontend sabe,
-    // sin adivinar el formato de los parámetros de Wompi, que debe mostrar
-    // la pantalla de agradecimiento en vez del formulario vacío.
     const redirectBase = Deno.env.get("WOMPI_REDIRECT_URL") || "https://www.predigoles.com/setup";
-    const redirectUrl = redirectBase + (redirectBase.includes("?") ? "&" : "?") + "pago=1";
     if (!publicKey || !integritySecret || !currency || !amountInCents) {
       return jsonOut({ status: "error", message: "La pasarela de pago todavía no está configurada. Intenta de nuevo más tarde." });
     }
@@ -60,6 +55,14 @@ Deno.serve(async (req: Request) => {
 
     const reference = String(solicitud.id);
     const signature = await sha256Hex(reference + amountInCents + currency + integritySecret);
+
+    // "pago=1" le dice a renderSetup() que viene de un checkout (sin
+    // depender de adivinar el formato de los parámetros propios de Wompi);
+    // "ref" le permite, con estado-pago-solicitud, confirmar que ESE pago
+    // puntual quedó realmente aprobado antes de decir "gracias por tu
+    // compra" -- antes se mostraba ese mensaje solo por haber vuelto del
+    // checkout, incluso si el pago fue rechazado o cancelado.
+    const redirectUrl = redirectBase + (redirectBase.includes("?") ? "&" : "?") + "pago=1&ref=" + encodeURIComponent(reference);
 
     const { error: errUpdate } = await db
       .from("group_requests")

@@ -549,9 +549,27 @@ async function restCall(pathAndQuery){
 }
 
 /* --- Storage local (identidad del dispositivo: "me", "organizer") --- Todo
-   lo demás ya se guarda en Supabase (ver edgeCall/restCall arriba). */
-async function getJSON(k){const v=localStorage.getItem("p:"+k);if(v==null)return null;try{return JSON.parse(v);}catch(e){return null;}}
-async function setJSON(k,o){localStorage.setItem("p:"+k,JSON.stringify(o));return true;}
+   lo demás ya se guarda en Supabase (ver edgeCall/restCall arriba).
+   Corrección (auditoría pre-lanzamiento, 2/10/2026): la clave vivía sin
+   aislar por grupo ("p:me" a secas), así que alguien que jugara o
+   administrara más de un grupo desde el mismo navegador arrastraba su
+   identidad del primer grupo al segundo -- se autoinscribía solo, con un ID
+   sin PIN válido ahí, dejando una fila fantasma en el roster. Ahora la
+   clave incluye TAB. Se migra en caliente la clave vieja (si existe y la
+   nueva todavía no) la primera vez que se lee en cada grupo, para no
+   desloguear a quien ya jugaba en un solo grupo -- y se borra la vieja de
+   una vez, así no queda ahí para filtrarse al siguiente grupo que se abra. */
+async function getJSON(k){
+  const key="p:"+k+"_"+TAB;
+  let v=localStorage.getItem(key);
+  if(v==null){
+    const legado=localStorage.getItem("p:"+k);
+    if(legado!=null){v=legado;localStorage.setItem(key,legado);localStorage.removeItem("p:"+k);}
+  }
+  if(v==null)return null;
+  try{return JSON.parse(v);}catch(e){return null;}
+}
+async function setJSON(k,o){localStorage.setItem("p:"+k+"_"+TAB,JSON.stringify(o));return true;}
 
 /* --- State --- */
 const S={me:null,mePinHash:null,roster:[],results:{},custom:[],allPreds:{},predsMe:{},dirty:new Set(),view:"partidos",organizer:false,organizerPinHash:null,now:Date.now(),selectedDay:null,groupName:null,torneoId:null,modoSeguimiento:"torneo",equiposSeguidos:[],teamOverrides:{},live:{},betting:{inscripcion:0,premios:{p1:0,p2:0,p3:0}},savingPreds:false};
@@ -1435,17 +1453,40 @@ const LANDING_BANDERAS={fpc_2026_2:"🇨🇴",la_liga_2026_27:"🇪🇸",champio
 function renderSetup(){
   const root=document.getElementById("root");
   // Vuelta del checkout de Wompi (ver crear-pago-wompi, que le agrega
-  // "pago=1" a la redirect-url): nunca se vuelve a mostrar el formulario
-  // vacío en esta visita -- el webhook ya está procesando el pago por su
-  // cuenta, aquí solo se confirma al comprador que se recibió.
+  // "pago=1&ref=<id>" a la redirect-url). Corrección (auditoría
+  // pre-lanzamiento, 2/10/2026): antes se mostraba "gracias por tu compra"
+  // solo por haber vuelto a esta URL, sin importar si Wompi aprobó,
+  // rechazó o el comprador canceló el pago -- ahora se confirma contra
+  // estado-pago-solicitud (que refleja lo que wompi-webhook ya verificó de
+  // verdad), con un par de reintentos cortos por si el webhook todavía no
+  // ha llegado.
   if(new URLSearchParams(location.search).get("pago")==="1"){
+    const ref=new URLSearchParams(location.search).get("ref");
     root.innerHTML=`
       <div class="kicker">PREDIGOLES</div>
-      <div class="card" style="border-color:var(--mint);max-width:100%;margin-top:20px">
+      <div class="card" style="max-width:100%;margin-top:20px" id="pago_card">
+        <div class="kicker" style="color:var(--mint)">Un momento...</div>
+        <h2>Confirmando tu pago</h2>
+        <p style="color:var(--muted);font-size:14px">Ya casi, estamos verificando con Wompi.</p>
+      </div>`;
+    (async()=>{
+      let pagado=false;
+      for(let i=0;ref&&i<5&&!pagado;i++){
+        if(i>0)await new Promise(res=>setTimeout(res,1500));
+        const r=await edgeCall("estado-pago-solicitud",{solicitudId:ref});
+        if(r&&r.status==="success"&&r.pagado)pagado=true;
+      }
+      const card=document.getElementById("pago_card");if(!card)return;
+      card.innerHTML=pagado?`
         <div class="kicker" style="color:var(--mint)">Pago recibido ✓</div>
         <h2>¡Gracias por tu compra!</h2>
         <p style="color:var(--muted);font-size:14px">Ya recibimos tu pago. En breve activamos tu grupo y te escribimos con el link y el PIN.</p>
-      </div>`;
+      `:`
+        <div class="kicker" style="color:var(--gold)">Estamos confirmando tu pago</div>
+        <h2>Ya casi...</h2>
+        <p style="color:var(--muted);font-size:14px">Si completaste el pago puede tardar un poco más en confirmarse -- te escribimos apenas quede listo. Si cancelaste o algo falló, puedes <a href="/setup" style="color:var(--mint)">intentarlo de nuevo</a>.</p>
+      `;
+    })();
     return;
   }
   const torneoIds=Object.keys(TOURNAMENTS);
