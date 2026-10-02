@@ -2106,7 +2106,7 @@ function renderPanelCentralMain(){
           // sin que el admin tenga que dar un segundo clic aparte.
           await edgeCall("admin-marcar-solicitud-atendida",{masterPin:PC_masterHash,solicitudId:s.id});
           PC_solicitudes=PC_solicitudes.filter(x=>x.id!==s.id);
-          mostrarGrupoCreado(r.grupoId,r.pin,s.nombreGrupo);
+          mostrarGrupoCreado(r.grupoId,r.pin,s.nombreGrupo,s.correoAdmin,s.nombreAdmin);
         }else{
           toast((r&&r.message)||"No se pudo crear el grupo.",true,4000);
         }
@@ -2147,7 +2147,11 @@ function renderPanelCentralMain(){
       await conCargando(btn,async()=>{
         const r=await edgeCall("admin-resetear-pin",{masterPin:PC_masterHash,grupoId:btn.dataset.id});
         if(r&&r.status==="success"){
-          mostrarGrupoCreado(r.grupoId,r.pin,btn.dataset.nombre);
+          // admin-resetear-pin no devuelve correo/nombre del admin -- se
+          // buscan en la lista ya cargada de grupos (PC_grupos), que sí los
+          // trae (ver admin-listar-grupos).
+          const g=PC_grupos.find(x=>x.grupoId===r.grupoId);
+          mostrarGrupoCreado(r.grupoId,r.pin,btn.dataset.nombre,g&&g.correoAdmin,g&&g.nombreAdmin);
         }else{
           toast((r&&r.message)||"No se pudo resetear.",true,4000);
         }
@@ -2233,7 +2237,7 @@ function showCrearGrupo(){
       const r=await edgeCall("admin-provisionar-grupo",{masterPin:PC_masterHash,grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pin});
       if(r&&r.status==="success"){
         ov.remove();
-        mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo);
+        mostrarGrupoCreado(r.grupoId,r.pin,nombreGrupo,correoAdmin,nombreAdmin);
       }else{
         err.textContent=(r&&r.message)||"No se pudo crear el grupo.";
       }
@@ -2241,11 +2245,15 @@ function showCrearGrupo(){
   };
 }
 
-function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
+function mostrarGrupoCreado(grupoId,pin,nombreGrupo,correoAdmin,nombreAdmin){
   const old=document.getElementById("ovl");if(old)old.remove();
   const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
   document.body.appendChild(ov);
   const link=`${location.origin}/?grupo=${grupoId}`;
+  // El botón de notificar por correo solo tiene sentido si sabemos a quién
+  // escribirle -- grupos viejos creados antes de pedir correo obligatorio
+  // pueden no tenerlo, así que se oculta en vez de fallar en silencio.
+  const botonCorreoHtml=correoAdmin?`<button class="btn ghost" id="gc_correo" style="margin-top:10px">✉️ Notificar al admin por correo</button>`:"";
   ov.innerHTML=`<div class="card" style="border-color:var(--mint)">
     <div class="kicker" style="color:var(--mint)">Grupo creado ✓</div>
     <h2>${escapeHtml(nombreGrupo)}</h2>
@@ -2255,11 +2263,20 @@ function mostrarGrupoCreado(grupoId,pin,nombreGrupo){
     <label class="field" style="margin-top:10px">PIN de administrador</label>
     <input class="input" id="gc_pin" readonly value="${escapeHtml(pin)}" style="letter-spacing:.3em;font-size:22px;text-align:center;color:var(--gold)">
     <button class="btn" id="gc_copiar" style="margin-top:14px">📋 Copiar link + PIN</button>
+    ${botonCorreoHtml}
     <button class="btn ghost" id="gc_cerrar" style="margin-top:10px">Cerrar</button>
   </div>`;
   document.getElementById("gc_copiar").onclick=()=>{
     navigator.clipboard.writeText(`Link: ${link}\nPIN de administrador: ${pin}`);
     toast("Copiado ✓",false,2000);
+  };
+  const btnCorreo=document.getElementById("gc_correo");
+  if(btnCorreo)btnCorreo.onclick=async()=>{
+    await conCargando(btnCorreo,async()=>{
+      const r=await edgeCall("notificar-admin-grupo",{masterPin:PC_masterHash,grupoId,nombreGrupo,nombreAdmin,correoAdmin,pin});
+      if(r&&r.status==="success")toast("Correo enviado ✓",false,2500);
+      else toast((r&&r.message)||"No se pudo enviar el correo.",true,4000);
+    },"Enviando...");
   };
   document.getElementById("gc_cerrar").onclick=async()=>{
     ov.remove();
