@@ -413,3 +413,13 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# wompi-webhook lo llama Wompi directo, servidor a servidor -- nunca conoce
+# ni puede mandar la anon key de Supabase, así que el gateway de Supabase
+# rechazaba la petición con 401 antes de que nuestra propia verificación de
+# firma de Wompi (X-Event-Checksum) llegara a correr (encontrado en el
+# Debugger de Wompi el 2/10/2026: Wompi sí llamaba, Supabase respondía
+# "UNAUTHORIZED_NO_AUTH_HEADER"). La seguridad del endpoint sigue intacta --
+# la firma de Wompi, verificada en el propio código, es la que protege.
+[functions.wompi-webhook]
+verify_jwt = false
