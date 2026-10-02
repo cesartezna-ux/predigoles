@@ -50,7 +50,18 @@ Deno.serve(async (req: Request) => {
     const checksumCalculado = await sha256Hex(base);
 
     if (checksumCalculado.toLowerCase() !== String(sig.checksum).toLowerCase()) {
-      console.error("[wompi-webhook] Firma inválida -- evento descartado.", { reference: tx.reference });
+      // Diagnóstico temporal (auditoría pre-lanzamiento, 2/10/2026): la
+      // firma real de Wompi no cuadraba y hacía falta ver exactamente qué
+      // se estaba comparando -- sin esto solo se sabía QUE fallaba, no POR
+      // QUÉ. Quitar una vez se confirme la causa exacta.
+      console.error("[wompi-webhook] Firma inválida -- evento descartado.", {
+        reference: tx.reference,
+        properties: sig.properties,
+        timestamp: body.timestamp,
+        base,
+        checksumCalculado,
+        checksumRecibido: sig.checksum,
+      });
       return jsonOut({ status: "error", message: "Firma inválida." });
     }
 
