@@ -52,7 +52,13 @@ Deno.serve(async (req: Request) => {
     const saludo = admin ? `¡Hola, ${admin}!` : "¡Hola!";
     const asunto = `Tu quiniela "${nombre}" ya está lista — Predigoles`;
 
-    const texto = `${saludo}
+    // RFC 5322 exige \r\n como fin de línea en el cuerpo del correo -- los
+    // template strings de JS solo traen \n. La mayoría de servidores SMTP
+    // lo toleran igual, pero el de GoDaddy lo rechaza de plano (552 "bare
+    // LF"), así que se normaliza antes de enviar.
+    const crlf = (s: string) => s.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n");
+
+    const texto = crlf(`${saludo}
 
 Tu quiniela "${nombre}" ya está lista en Predigoles.
 
@@ -63,9 +69,9 @@ Para entrar como organizador: abre el link, toca el botón "Organizador" (abajo 
 
 Desde ahí puedes invitar a tus jugadores compartiendo el mismo link, configurar premios, y ver el ranking en tiempo real.
 
-Guarda este correo -- es la única vez que se envía el PIN en texto plano.`;
+Guarda este correo -- es la única vez que se envía el PIN en texto plano.`);
 
-    const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#222">
+    const html = crlf(`<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#222">
       <h2 style="margin:0 0 12px">${saludo}</h2>
       <p>Tu quiniela <b>${nombre}</b> ya está lista en Predigoles.</p>
       <p><b>Link de tu grupo:</b><br><a href="${link}">${link}</a></p>
@@ -73,7 +79,7 @@ Guarda este correo -- es la única vez que se envía el PIN en texto plano.`;
       <p>Para entrar como organizador: abre el link, toca el botón <b>"Organizador"</b> (abajo de la pantalla) e ingresa tu PIN.</p>
       <p>Desde ahí puedes invitar a tus jugadores compartiendo el mismo link, configurar premios, y ver el ranking en tiempo real.</p>
       <p style="color:#888;font-size:12px">Guarda este correo — es la única vez que se envía el PIN en texto plano.</p>
-    </div>`;
+    </div>`);
 
     const client = new SMTPClient({
       connection: {
