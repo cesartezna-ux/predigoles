@@ -1397,7 +1397,7 @@ function renderSetup(){
   root.innerHTML=`
     <div class="kicker">PREDIGOLES</div>
     <h1>Activa <span class="yr">tu quiniela</span></h1>
-    <p class="sub">Ya compraste tu acceso — cuéntanos cómo quieres tu grupo y lo activamos.</p>
+    <p class="sub">Cuéntanos cómo quieres tu grupo para activarlo.</p>
     <div class="card" style="max-width:100%;margin-top:20px">
       <label class="field">ID del grupo (para el link — solo letras, números, guiones)</label>
       <input class="input" id="st_id" maxlength="40" placeholder="ej: mioficina2026">
@@ -1451,15 +1451,36 @@ function renderSetup(){
     if(pinDeseado&&!/^\d{4}$/.test(pinDeseado)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
     await conCargando(document.getElementById("st_enviar"),async()=>{
       const r=await edgeCall("solicitar-grupo",{grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pinDeseado});
-      if(r&&r.status==="success"){
-        root.innerHTML=`<div class="card" style="border-color:var(--mint);max-width:100%;margin-top:20px">
-          <div class="kicker" style="color:var(--mint)">Solicitud enviada ✓</div>
-          <h2>¡Listo, ${escapeHtml(nombreAdmin)}!</h2>
-          <p style="color:var(--muted);font-size:14px">En breve activamos tu grupo y te escribimos a <b style="color:var(--line)">${escapeHtml(correoAdmin)}</b> o <b style="color:var(--line)">${escapeHtml(celularAdmin)}</b> con el link y el PIN.</p>
-        </div>`;
-      }else{
+      if(!r||r.status!=="success"){
         err.textContent=(r&&r.message)||"No se pudo enviar. Intenta de nuevo.";
+        return;
       }
+      // Si Wompi ya está configurado, pagar es el siguiente paso: se redirige
+      // al Checkout Web de Wompi con una firma calculada en el servidor (ver
+      // crear-pago-wompi). Si todavía no está configurado (pasarela en
+      // proceso de activación), sigue funcionando como hoy -- sin romper el
+      // flujo mientras tanto.
+      const pago=await edgeCall("crear-pago-wompi",{solicitudId:r.solicitudId});
+      if(pago&&pago.status==="success"){
+        const params=new URLSearchParams({
+          "public-key":pago.publicKey,
+          "currency":pago.currency,
+          "amount-in-cents":String(pago.amountInCents),
+          "reference":pago.reference,
+          "signature:integrity":pago.signature,
+          "redirect-url":pago.redirectUrl,
+          "customer-data:email":correoAdmin,
+          "customer-data:full-name":nombreAdmin,
+          "customer-data:phone-number":celularAdmin,
+        });
+        location.href=pago.checkoutUrl+"?"+params.toString();
+        return;
+      }
+      root.innerHTML=`<div class="card" style="border-color:var(--mint);max-width:100%;margin-top:20px">
+        <div class="kicker" style="color:var(--mint)">Solicitud enviada ✓</div>
+        <h2>¡Listo, ${escapeHtml(nombreAdmin)}!</h2>
+        <p style="color:var(--muted);font-size:14px">En breve activamos tu grupo y te escribimos a <b style="color:var(--line)">${escapeHtml(correoAdmin)}</b> o <b style="color:var(--line)">${escapeHtml(celularAdmin)}</b> con el link y el PIN.</p>
+      </div>`;
     },"Enviando...");
   };
 }
@@ -1993,7 +2014,10 @@ function renderPanelCentralMain(){
     <div class="rules" style="border-color:rgba(255,200,69,.35);padding:0;overflow:hidden">
       ${PC_solicitudes.map((s,i)=>`
       <div style="padding:14px${i?';border-top:1px solid var(--faint)':""}">
-        <div style="font-weight:700;color:var(--line)">${escapeHtml(s.nombreGrupo)} <span style="color:var(--muted);font-weight:400">(${escapeHtml(s.grupoId)})</span></div>
+        <div style="font-weight:700;color:var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${escapeHtml(s.nombreGrupo)} <span style="color:var(--muted);font-weight:400">(${escapeHtml(s.grupoId)})</span>
+          ${s.estadoPago==="pagado"?'<span style="font-size:11px;font-weight:700;color:var(--mint);background:rgba(54,224,191,.12);border:1px solid rgba(54,224,191,.4);border-radius:999px;padding:2px 8px">✓ PAGADO</span>':'<span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:2px 8px">SIN PAGAR</span>'}
+        </div>
         <div style="color:var(--muted);font-size:12.5px;margin-top:4px">
           Torneo: ${escapeHtml((TOURNAMENTS[s.torneoId]||{}).nombre||s.torneoId)} ·
           ${s.modoSeguimiento==="equipo"?"Equipos: "+escapeHtml((s.equiposSeguidos||[]).join(", ")):"Todo el torneo"}<br>
@@ -2002,6 +2026,7 @@ function renderPanelCentralMain(){
         </div>
         <div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap">
           <button class="link-btn pc-solicitud-crear" data-id="${escapeHtml(s.id)}" style="color:var(--gold)">➕ Crear grupo con estos datos</button>
+          <button class="link-btn pc-solicitud-pago" data-id="${escapeHtml(s.id)}" data-nuevo-estado="${s.estadoPago==="pagado"?"pendiente":"pagado"}" style="color:var(--muted)">${s.estadoPago==="pagado"?"↺ Marcar sin pagar":"💰 Marcar como pagada"}</button>
           <button class="link-btn pc-solicitud-ok" data-id="${escapeHtml(s.id)}" style="color:var(--mint)">✓ Marcar como atendida</button>
         </div>
       </div>`).join("")}
@@ -2072,6 +2097,21 @@ function renderPanelCentralMain(){
           toast((r&&r.message)||"No se pudo crear el grupo.",true,4000);
         }
       },"Creando...");
+    };
+  });
+  document.querySelectorAll(".pc-solicitud-pago").forEach(btn=>{
+    btn.onclick=async()=>{
+      await conCargando(btn,async()=>{
+        const nuevoEstado=btn.dataset.nuevoEstado;
+        const r=await edgeCall("admin-marcar-solicitud-pagada",{masterPin:PC_masterHash,solicitudId:btn.dataset.id,estadoPago:nuevoEstado});
+        if(r&&r.status==="success"){
+          const s=PC_solicitudes.find(x=>x.id===btn.dataset.id);
+          if(s)s.estadoPago=nuevoEstado;
+          renderPanelCentralMain();
+        }else{
+          toast((r&&r.message)||"No se pudo actualizar.",true,3000);
+        }
+      },"...");
     };
   });
   document.querySelectorAll(".pc-solicitud-ok").forEach(btn=>{

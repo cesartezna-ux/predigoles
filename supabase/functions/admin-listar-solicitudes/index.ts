@@ -22,7 +22,7 @@ Deno.serve(async (req: Request) => {
 
     const { data, error } = await db
       .from("group_requests")
-      .select("id, grupo_id, nombre_grupo, torneo_id, modo_seguimiento, equipos_seguidos, nombre_admin, celular_admin, correo_admin, pin_deseado, created_at")
+      .select("id, grupo_id, nombre_grupo, torneo_id, modo_seguimiento, equipos_seguidos, nombre_admin, celular_admin, correo_admin, pin_deseado, created_at, estado_pago")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true });
     if (error) return errOut("admin-listar-solicitudes", error);
@@ -41,6 +41,7 @@ Deno.serve(async (req: Request) => {
         correoAdmin: s.correo_admin,
         pinDeseado: s.pin_deseado,
         fechaSolicitud: s.created_at,
+        estadoPago: s.estado_pago,
       })),
     });
   } catch (err) {

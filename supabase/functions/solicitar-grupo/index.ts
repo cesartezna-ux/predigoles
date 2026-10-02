@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
     const { data: yaSolicitado } = await db.from("group_requests").select("id").eq("grupo_id", grupoId).eq("estado", "pendiente").maybeSingle();
     if (yaSolicitado) return jsonOut({ status: "error", message: "Ya hay una solicitud pendiente con ese ID de grupo. Elige otro, o espera a que se active." });
 
-    const { error } = await db.from("group_requests").insert({
+    const { data, error } = await db.from("group_requests").insert({
       grupo_id: grupoId,
       nombre_grupo: nombreGrupo,
       torneo_id: torneoId,
@@ -87,10 +87,13 @@ Deno.serve(async (req: Request) => {
       celular_admin: celularAdmin,
       correo_admin: correoAdmin,
       pin_deseado: pinDeseado,
-    });
+    }).select("id").single();
     if (error) return errOut("solicitar-grupo", error);
 
-    return jsonOut({ status: "success" });
+    // El frontend necesita este id para pedir el link de pago (crear-pago-wompi)
+    // usándolo como referencia -- así el webhook sabe a qué solicitud corresponde
+    // un pago confirmado.
+    return jsonOut({ status: "success", solicitudId: data.id });
   } catch (err) {
     return errOut("solicitar-grupo", err);
   }
