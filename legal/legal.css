@@ -12,7 +12,11 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{font-family:var(--body);color:var(--line);background:var(--pitch);-webkit-font-smoothing:antialiased;min-height:100vh}
-.wrap{max-width:640px;margin:0 auto;padding:40px 16px 80px}
+/* Mismo padding lateral y superior que .wrap en index.html, para que el
+   margen se sienta idéntico al cambiar entre la app y estas páginas de solo
+   texto -- el inferior se queda más corto porque aquí no hay una barra fija
+   abajo (el savebar de pronósticos) que necesite el espacio extra. */
+.wrap{max-width:640px;margin:0 auto;padding:36px 14px 80px}
 a{color:var(--mint)}
 .back{display:inline-block;margin-bottom:24px;color:var(--muted);font-size:13px;text-decoration:none}
 .back:hover{color:var(--mint)}
