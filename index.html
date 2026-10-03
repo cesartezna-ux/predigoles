@@ -38,7 +38,7 @@
     background-image:radial-gradient(120% 60% at 50% -10%,rgba(54,224,191,.08),transparent 60%),
     repeating-linear-gradient(180deg,transparent 0 46px,rgba(255,255,255,.012) 46px 92px);
     -webkit-font-smoothing:antialiased;min-height:100vh}
-  .wrap{max-width:640px;margin:0 auto;padding:0 14px 120px}
+  .wrap{max-width:640px;margin:0 auto;padding:20px 14px 120px}
   a{color:var(--mint)}
   header{padding:22px 2px 12px;position:relative}
   .topfijo{position:sticky;top:0;z-index:30;background:var(--pitch);padding-bottom:4px}
@@ -1409,6 +1409,9 @@ function showComoUsar(){
     <div class="kicker" style="color:var(--mint)">Modo Organizador</div>
     <h2>Cómo usar Predigoles</h2>
 
+    <div class="sectionlbl">Tu perfil de jugador vs. tu PIN de administrador</div>
+    <div class="orglist"><div style="padding:14px;color:var(--muted);font-size:13px">Son dos cosas distintas. Tu <b style="color:var(--line)">perfil de jugador</b> (nombre + un PIN que tú eliges) es para participar y pronosticar, igual que cualquiera del grupo. Tu <b style="color:var(--line)">PIN de administrador</b> (el que te llegó por correo al crear el grupo) es aparte, y solo sirve para entrar aquí, al modo Organizador.</div></div>
+
     <div class="sectionlbl">Invita a tus jugadores</div>
     <div class="orglist"><div style="padding:14px;color:var(--muted);font-size:13px">Comparte el mismo link de tu grupo (el que recibiste por correo) — cada persona crea su propio ícono y PIN la primera vez que entra. No hace falta ningún registro ni correo de cada jugador.</div></div>
 
@@ -1480,7 +1483,7 @@ function renderSetup(){
       card.innerHTML=pagado?`
         <div class="kicker" style="color:var(--mint)">Pago recibido ✓</div>
         <h2>¡Gracias por tu compra!</h2>
-        <p style="color:var(--muted);font-size:14px">Ya recibimos tu pago. En breve activamos tu grupo y te escribimos con el link y el PIN.</p>
+        <p style="color:var(--muted);font-size:14px">Ya recibimos tu pago y activamos tu grupo. Revisa tu correo — ahí te enviamos el link y las instrucciones para entrar.</p>
       `:`
         <div class="kicker" style="color:var(--gold)">Estamos confirmando tu pago</div>
         <h2>Ya casi...</h2>

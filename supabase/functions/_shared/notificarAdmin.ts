@@ -49,17 +49,21 @@ Tu quiniela "${nombre}" ya está lista en Predigoles.
 Link de tu grupo: ${link}
 Tu PIN de administrador: ${pinLimpio}
 
-Para entrar como organizador: abre el link, toca el botón "Organizador" (abajo de la pantalla) e ingresa tu PIN. Ahí mismo, en el menú, encuentras "Cómo usar Predigoles" con la guía completa (invitar jugadores, reglas del juego, premios, y más).
+1) Abre el link y crea tu perfil de jugador (tu nombre + un PIN tuyo, el que quieras) -- así quedas participando como uno más. Ese PIN es tuyo, distinto al de administrador.
+2) Para entrar como organizador: toca el botón "Organizador" (abajo de la pantalla) e ingresa el PIN de administrador de arriba -- ese sí es el que te acabamos de enviar.
+3) Ahí mismo, en el menú, encuentras "Cómo usar Predigoles" con la guía completa (invitar jugadores, reglas del juego, premios, y más).
 
-Guarda este correo -- es la única vez que se envía el PIN en texto plano.`);
+Guarda este correo -- es la única vez que se envía el PIN de administrador en texto plano.`);
 
   const html = crlf(`<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#222">
       <h2 style="margin:0 0 12px">${saludo}</h2>
       <p>Tu quiniela <b>${nombre}</b> ya está lista en Predigoles.</p>
       <p><b>Link de tu grupo:</b><br><a href="${link}">${link}</a></p>
       <p><b>Tu PIN de administrador:</b><br><span style="font-size:22px;letter-spacing:4px;font-weight:bold">${pinLimpio}</span></p>
-      <p>Para entrar como organizador: abre el link, toca el botón <b>"Organizador"</b> (abajo de la pantalla) e ingresa tu PIN. Ahí mismo, en el menú, encuentras <b>"Cómo usar Predigoles"</b> con la guía completa (invitar jugadores, reglas del juego, premios, y más).</p>
-      <p style="color:#888;font-size:12px">Guarda este correo — es la única vez que se envía el PIN en texto plano.</p>
+      <p><b>1)</b> Abre el link y crea tu perfil de jugador (tu nombre + un PIN tuyo, el que quieras) -- así quedas participando como uno más. Ese PIN es tuyo, distinto al de administrador.</p>
+      <p><b>2)</b> Para entrar como organizador: toca el botón <b>"Organizador"</b> (abajo de la pantalla) e ingresa el PIN de administrador de arriba -- ese sí es el que te acabamos de enviar.</p>
+      <p><b>3)</b> Ahí mismo, en el menú, encuentras <b>"Cómo usar Predigoles"</b> con la guía completa (invitar jugadores, reglas del juego, premios, y más).</p>
+      <p style="color:#888;font-size:12px">Guarda este correo — es la única vez que se envía el PIN de administrador en texto plano.</p>
     </div>`);
 
   const client = new SMTPClient({
