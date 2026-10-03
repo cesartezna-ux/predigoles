@@ -1,6 +1,7 @@
-// Lista los comentarios nuevos (ver enviar-comentario) para Panel Central.
-// Solo trae "nuevo" -- los ya leídos no se listan más (quedan en la tabla
-// como historial, pero no hace falta seguir viéndolos cada vez que entras).
+// Lista los comentarios (ver enviar-comentario) para Panel Central -- trae
+// tanto "nuevo" como "leido" (hasta 200, los más recientes primero) para que
+// el panel pueda mostrar las dos pestañas (Nuevos/Leídos) sin pedirle nada
+// aparte al servidor al cambiar de vista.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
 import { checkMasterAuth } from "../_shared/auth.ts";
@@ -22,8 +23,7 @@ Deno.serve(async (req: Request) => {
 
     const { data, error } = await db
       .from("feedback")
-      .select("id, origen, grupo_id, autor_nombre, mensaje, created_at")
-      .eq("estado", "nuevo")
+      .select("id, origen, grupo_id, autor_nombre, mensaje, estado, created_at")
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) return errOut("admin-listar-comentarios", error);
@@ -36,6 +36,7 @@ Deno.serve(async (req: Request) => {
         grupoId: c.grupo_id,
         autorNombre: c.autor_nombre,
         mensaje: c.mensaje,
+        estado: c.estado,
         fecha: c.created_at,
       })),
     });

@@ -2044,6 +2044,24 @@ let PC_masterHash=null;
 let PC_grupos=[];
 let PC_solicitudes=[];
 let PC_comentarios=[];
+let PC_tab="grupos"; // grupos | solicitudes | comentarios
+let PC_comentariosVer="nuevos"; // nuevos | leidos
+
+// Exporta cualquier tabla simple a CSV -- se usa tal cual desde Excel/Sheets,
+// sin necesidad de una librería para generar .xlsx real. El BOM al inicio es
+// lo que hace que Excel detecte UTF-8 solo y no deforme tildes/ñ.
+function descargarCSV(filename,headers,rows){
+  const esc=v=>{
+    const s=v==null?"":String(v);
+    return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  };
+  const lineas=[headers.map(esc).join(","),...rows.map(r=>r.map(esc).join(","))];
+  const blob=new Blob(["﻿"+lineas.join("\r\n")],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},0);
+}
 
 function pcCard(inner){
   root.innerHTML=`<div style="max-width:520px;margin:40px auto;padding:0 14px">${inner}</div>`;
@@ -2089,6 +2107,28 @@ function fmtFechaCorta(iso){
 }
 
 function renderPanelCentralMain(){
+  const totalGrupos=PC_grupos.length;
+  const pagados=PC_grupos.filter(g=>g.estadoPago==="Pagado").length;
+  const pendientesGrupos=PC_grupos.filter(g=>g.estadoPago==="Pendiente").length;
+  const cortesias=PC_grupos.filter(g=>g.estadoPago==="Cortesía").length;
+  const statTile=(n,lbl,color)=>`<div style="background:var(--panel);border:1px solid var(--faint);border-radius:14px;padding:12px 8px;text-align:center;min-width:0">
+    <div style="font-family:var(--score);font-size:28px;line-height:1;color:${color}">${n}</div>
+    <div style="color:var(--muted);font-size:10.5px;margin-top:4px;letter-spacing:.02em">${lbl}</div>
+  </div>`;
+  const statsHtml=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px">
+    ${statTile(totalGrupos,"Total grupos","var(--line)")}
+    ${statTile(pagados,"Pagados","var(--mint)")}
+    ${statTile(pendientesGrupos,"Pendientes","var(--gold)")}
+    ${statTile(cortesias,"Cortesías","#b893ff")}
+  </div>`;
+
+  const nuevosCount=PC_comentarios.filter(c=>c.estado!=="leido").length;
+  const tabsHtml=`<div class="tabs" style="position:static">
+    <div class="tab ${PC_tab==="grupos"?"active":""}" data-pctab="grupos">Grupos${totalGrupos?" ("+totalGrupos+")":""}</div>
+    <div class="tab ${PC_tab==="solicitudes"?"active":""}" data-pctab="solicitudes">Solicitudes${PC_solicitudes.length?" ("+PC_solicitudes.length+")":""}</div>
+    <div class="tab ${PC_tab==="comentarios"?"active":""}" data-pctab="comentarios">Comentarios${nuevosCount?" ("+nuevosCount+")":""}</div>
+  </div>`;
+
   const filas=PC_grupos.length?PC_grupos.map(g=>`
     <div class="row">
       <div class="who">
@@ -2102,6 +2142,7 @@ function renderPanelCentralMain(){
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
           <a href="${location.origin}/?grupo=${encodeURIComponent(g.grupoId)}" target="_blank" class="link-btn" style="text-decoration:none;color:var(--mint)">🔗 Abrir grupo</a>
           <button class="link-btn pc-reset" data-id="${escapeHtml(g.grupoId)}" data-nombre="${escapeHtml(g.nombreGrupo||g.grupoId)}" style="color:var(--flare)">🔑 Resetear PIN</button>
+          <button class="link-btn pc-eliminar" data-id="${escapeHtml(g.grupoId)}" data-nombre="${escapeHtml(g.nombreGrupo||g.grupoId)}" style="color:var(--flare)">🗑️ Eliminar grupo</button>
         </div>
       </div>
       <div class="score" style="text-align:right">
@@ -2113,11 +2154,14 @@ function renderPanelCentralMain(){
       </div>
     </div>`).join(""):`<div class="empty" style="padding:30px 10px"><span class="big">📋</span>Todavía no hay grupos creados.</div>`;
 
-  // Solicitudes desde /setup (post-compra en Gumroad) -- solo se muestra la
-  // sección si hay algo pendiente, para no llenar el panel de vacío la
-  // mayor parte del tiempo.
-  const solicitudesHtml=PC_solicitudes.length?`
-    <div class="kicker" style="color:var(--gold);margin:22px 0 8px">Solicitudes pendientes (${PC_solicitudes.length})</div>
+  const gruposPaneHtml=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn" id="pc_nuevo" style="flex:none">➕ Crear grupo nuevo</button>
+      <button class="btn ghost" id="pc_exportar_grupos" style="flex:none">⬇️ Exportar CSV</button>
+    </div>
+    ${filas}`;
+
+  const solicitudesPaneHtml=PC_solicitudes.length?`
     <div class="rules" style="border-color:rgba(255,200,69,.35);padding:0;overflow:hidden">
       ${PC_solicitudes.map((s,i)=>`
       <div style="padding:14px${i?';border-top:1px solid var(--faint)':""}">
@@ -2138,45 +2182,76 @@ function renderPanelCentralMain(){
         </div>
       </div>`).join("")}
     </div>
-  `:"";
+  `:`<div class="empty" style="padding:30px 10px"><span class="big">📥</span>No hay solicitudes pendientes.</div>`;
 
-  // Comentarios del botón flotante -- mismo trato que solicitudes: solo se
-  // muestra si hay algo nuevo, y "Marcar como leído" lo saca de la lista.
+  // Comentarios del botón flotante -- "Nuevos" y "Leídos" como dos vistas de
+  // la misma lista ya cargada (admin-listar-comentarios trae ambos), sin
+  // pedirle nada aparte al servidor al cambiar de vista.
   const origenLabel={landing:"🌐 Home",jugador:"⚽ Jugador",organizador:"🔑 Organizador"};
-  const comentariosHtml=PC_comentarios.length?`
-    <div class="kicker" style="color:var(--mint);margin:22px 0 8px">Comentarios nuevos (${PC_comentarios.length})</div>
-    <div class="rules" style="border-color:rgba(87,230,150,.35);padding:0;overflow:hidden">
-      ${PC_comentarios.map((c,i)=>`
+  const comentariosVisibles=PC_comentarios.filter(c=>PC_comentariosVer==="nuevos"?c.estado!=="leido":c.estado==="leido");
+  const leidosCount=PC_comentarios.length-nuevosCount;
+  const comentariosPaneHtml=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="display:inline-flex;background:var(--panel2);border:1px solid var(--faint);border-radius:11px;padding:3px;gap:2px">
+        <button class="link-btn pc-comver" data-ver="nuevos" style="padding:7px 14px;border-radius:8px;text-decoration:none;${PC_comentariosVer==="nuevos"?"background:var(--raise);color:var(--line)":"color:var(--muted)"}">Nuevos (${nuevosCount})</button>
+        <button class="link-btn pc-comver" data-ver="leidos" style="padding:7px 14px;border-radius:8px;text-decoration:none;${PC_comentariosVer==="leidos"?"background:var(--raise);color:var(--line)":"color:var(--muted)"}">Leídos (${leidosCount})</button>
+      </div>
+      <button class="btn ghost" id="pc_exportar_comentarios">⬇️ Exportar CSV</button>
+    </div>
+    ${comentariosVisibles.length?`<div class="rules" style="border-color:rgba(87,230,150,.35);padding:0;overflow:hidden">
+      ${comentariosVisibles.map((c,i)=>`
       <div style="padding:14px${i?';border-top:1px solid var(--faint)':""}">
         <div style="color:var(--muted);font-size:12px">
           ${origenLabel[c.origen]||c.origen}${c.grupoId?" · grupo: "+escapeHtml(c.grupoId):""}${c.autorNombre?" · "+escapeHtml(c.autorNombre):""} · ${fmtFechaCorta(c.fecha)}
         </div>
         <div style="color:var(--line);font-size:14px;margin-top:4px;white-space:pre-wrap">${escapeHtml(c.mensaje)}</div>
-        <button class="link-btn pc-comentario-ok" data-id="${escapeHtml(c.id)}" style="color:var(--mint);margin-top:8px">✓ Marcar como leído</button>
+        ${c.estado!=="leido"?`<button class="link-btn pc-comentario-ok" data-id="${escapeHtml(c.id)}" style="color:var(--mint);margin-top:8px">✓ Marcar como leído</button>`:""}
       </div>`).join("")}
-    </div>
-  `:"";
+    </div>`:`<div class="empty" style="padding:30px 10px"><span class="big">💬</span>Nada por aquí todavía.</div>`}
+  `;
+
+  const panesHtml=PC_tab==="grupos"?gruposPaneHtml:PC_tab==="solicitudes"?solicitudesPaneHtml:comentariosPaneHtml;
 
   pcCard(`
     <div class="kicker" style="color:var(--mint);margin-bottom:2px">PREDIGOLES</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <h1 style="font-family:var(--display);font-size:28px;margin:0;text-transform:uppercase">Panel Central</h1>
       <button class="link-btn" id="pc_salir">salir</button>
     </div>
-    <div style="color:var(--muted);font-size:12.5px;margin-bottom:16px">${PC_grupos.length} grupo${PC_grupos.length===1?"":"s"} registrado${PC_grupos.length===1?"":"s"}</div>
-    ${solicitudesHtml}
-    ${comentariosHtml}
-    <button class="btn" id="pc_nuevo" style="margin-top:18px;margin-bottom:18px">➕ Crear grupo nuevo</button>
-    ${filas}
+    ${statsHtml}
+    ${tabsHtml}
+    <div style="margin-top:16px">${panesHtml}</div>
   `);
   document.getElementById("pc_salir").onclick=()=>{PC_masterHash=null;bootPanelCentral();};
-  document.getElementById("pc_nuevo").onclick=showCrearGrupo;
+  document.querySelectorAll("[data-pctab]").forEach(t=>{
+    t.onclick=()=>{PC_tab=t.dataset.pctab;renderPanelCentralMain();};
+  });
+  const btnNuevo=document.getElementById("pc_nuevo");if(btnNuevo)btnNuevo.onclick=showCrearGrupo;
+  const btnExpGrupos=document.getElementById("pc_exportar_grupos");
+  if(btnExpGrupos)btnExpGrupos.onclick=()=>{
+    descargarCSV("predigoles_grupos.csv",
+      ["ID","Nombre","Torneo","Admin","Celular","Correo","Estado pago","Creado"],
+      PC_grupos.map(g=>[g.grupoId,g.nombreGrupo,(TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId,g.nombreAdmin,g.celularAdmin,g.correoAdmin,g.estadoPago,fmtFechaCorta(g.fechaCreacion)]));
+  };
+  const btnExpCom=document.getElementById("pc_exportar_comentarios");
+  if(btnExpCom)btnExpCom.onclick=()=>{
+    descargarCSV("predigoles_comentarios.csv",
+      ["Fecha","Origen","Grupo","Autor","Estado","Mensaje"],
+      PC_comentarios.map(c=>[fmtFechaCorta(c.fecha),origenLabel[c.origen]||c.origen,c.grupoId||"",c.autorNombre||"",c.estado,c.mensaje]));
+  };
+  document.querySelectorAll(".pc-comver").forEach(btn=>{
+    btn.onclick=()=>{PC_comentariosVer=btn.dataset.ver;renderPanelCentralMain();};
+  });
+  document.querySelectorAll(".pc-eliminar").forEach(btn=>{
+    btn.onclick=()=>showEliminarGrupo(btn.dataset.id,btn.dataset.nombre);
+  });
   document.querySelectorAll(".pc-comentario-ok").forEach(btn=>{
     btn.onclick=async()=>{
       await conCargando(btn,async()=>{
         const r=await edgeCall("admin-marcar-comentario-leido",{masterPin:PC_masterHash,comentarioId:btn.dataset.id});
         if(r&&r.status==="success"){
-          PC_comentarios=PC_comentarios.filter(c=>c.id!==btn.dataset.id);
+          const c=PC_comentarios.find(x=>x.id===btn.dataset.id);
+          if(c)c.estado="leido";
           renderPanelCentralMain();
         }else{
           toast((r&&r.message)||"No se pudo actualizar.",true,3000);
@@ -2260,6 +2335,45 @@ function renderPanelCentralMain(){
       else toast("No se pudo actualizar.",true,3000);
     };
   });
+}
+
+// Confirmación reforzada (escribir el nombre exacto) porque esto borra el
+// grupo por completo -- jugadores, pronósticos y configuración se van con
+// él por el "on delete cascade" del esquema. Pensado sobre todo para
+// limpiar grupos de prueba; la autoridad real sigue siendo el PIN maestro
+// (ya validado al entrar a Panel Central), esto es solo fricción extra
+// contra un clic accidental en algo irreversible.
+function showEliminarGrupo(grupoId,nombreGrupo){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  ov.innerHTML=`<div class="card" style="border-color:rgba(255,77,109,.4)">
+    <div class="kicker" style="color:var(--flare)">Acción irreversible</div>
+    <h2>Eliminar grupo</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Vas a eliminar <b style="color:var(--line)">"${escapeHtml(nombreGrupo)}"</b> por completo: jugadores, pronósticos y configuración. Esto no se puede deshacer.</p>
+    <div style="background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:14px">⚠️ Si el grupo tiene jugadores activos, van a perder su historial de pronósticos y ranking sin aviso previo.</div>
+    <label class="field">Escribe el nombre del grupo para confirmar</label>
+    <input class="input" id="eg_input" placeholder="${escapeHtml(nombreGrupo)}">
+    <div id="eg_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:6px;text-align:center"></div>
+    <button class="btn" id="eg_confirm" style="margin-top:8px;background:var(--flare)" disabled>🗑️ Eliminar definitivamente</button>
+    <button class="btn ghost" id="eg_cancel" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  const input=document.getElementById("eg_input"),confirmBtn=document.getElementById("eg_confirm");
+  input.oninput=()=>{confirmBtn.disabled=input.value.trim()!==nombreGrupo;};
+  document.getElementById("eg_cancel").onclick=()=>ov.remove();
+  confirmBtn.onclick=async()=>{
+    await conCargando(confirmBtn,async()=>{
+      const r=await edgeCall("admin-eliminar-grupo",{masterPin:PC_masterHash,grupoId});
+      if(r&&r.status==="success"){
+        PC_grupos=PC_grupos.filter(g=>g.grupoId!==grupoId);
+        ov.remove();
+        renderPanelCentralMain();
+        toast("Grupo eliminado",false,2500);
+      }else{
+        document.getElementById("eg_err").textContent=(r&&r.message)||"No se pudo eliminar.";
+      }
+    },"Eliminando...");
+  };
 }
 
 function showCrearGrupo(){
