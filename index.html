@@ -1,5 +1,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '4601108483445142');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=4601108483445142&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 <title>Predigoles — La quiniela de tu grupo</title>
 <meta name="description" content="Pronósticos, resultados en tiempo real y ranking automático para la quiniela de tu oficina, familia o amigos. Sin Excel, sin sumar puntos a mano.">
 <link rel="canonical" href="https://www.predigoles.com/">
@@ -1479,6 +1496,17 @@ function renderSetup(){
         const r=await edgeCall("estado-pago-solicitud",{solicitudId:ref});
         if(r&&r.status==="success"&&r.pagado)pagado=true;
       }
+      // Purchase solo con pago confirmado por el servidor (no por haber vuelto
+      // del checkout), y una sola vez por solicitud: un refresh no lo cuenta de nuevo.
+      if(pagado&&ref){
+        try{
+          const clave="pg_purchase_"+ref;
+          if(!localStorage.getItem(clave)){
+            fbq('track','Purchase',{value:30000,currency:'COP'});
+            localStorage.setItem(clave,"1");
+          }
+        }catch(e){}
+      }
       const card=document.getElementById("pago_card");if(!card)return;
       card.innerHTML=pagado?`
         <div class="kicker" style="color:var(--mint)">Pago recibido ✓</div>
@@ -1603,7 +1631,7 @@ function renderLanding(){
 
       <div id="landing_live"></div>
 
-      <a class="btn" href="/setup" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+      <a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
       <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$30.000 COP · pago único por grupo, sin cobros por jugador</div>
     </div>
 
@@ -1711,7 +1739,7 @@ function showGrupoNoEncontrado(){
     <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Si crees que esto es un error, contacta a quien te compartió el link.</p>
     <div class="addbox" style="margin:0">
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿No tienes aún creada tu quiniela?</div>
-      <a class="smallbtn full" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/setup" target="_blank" rel="noopener">🚀 Cómprala aquí</a>
+      <a class="smallbtn full" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')">🚀 Cómprala aquí</a>
     </div>
   </div>`;
 }
