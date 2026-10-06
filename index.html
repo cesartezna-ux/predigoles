@@ -1645,6 +1645,9 @@ function renderLanding(){
     <div class="sectionlbl">Torneos cubiertos</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">${torneosChips}</div>
 
+    <div class="sectionlbl">Pruébalo ahora · demo</div>
+    <div class="orglist" id="demo_box" style="padding:14px"><div style="color:var(--muted);font-size:13px">Cargando el demo…</div></div>
+
     <div class="sectionlbl">Reglas del juego</div>
     <div class="orglist">
       <div style="padding:14px"><span class="pill">+1</span> <span style="color:var(--muted);font-size:13px">si aciertas quién gana (o el empate).</span></div>
@@ -1719,6 +1722,124 @@ function renderLanding(){
     const torneoNombre=(TOURNAMENTS[next.torneo_id]||{}).nombre||next.torneo_id;
     el.innerHTML=`<div class="chip" style="margin-top:14px">🗓️ Próximo: <b style="color:var(--line);margin-left:4px">${escapeHtml(next.home)} vs ${escapeHtml(next.away)}</b> · ${fmtFechaCorta(next.kickoff)} · ${FT.format(new Date(next.kickoff))} · ${escapeHtml(torneoNombre)}</div>`;
   })();
+  montarDemo();
+}
+
+/* --- Demo público de la landing (ver demo-pronosticar / demo-ranking).
+   Pronósticos sobre el partido en vivo, sin PIN ni grupo. Es un embudo:
+   cuando alguien ya participó en ese partido, se le invita a crear su grupo. */
+const DEMO_EMOJIS=["⚽","🏆","🔥","😎","🦁","🐯"];
+function demoNavegadorId(){
+  try{
+    let id=localStorage.getItem("pg_demo_nav");
+    if(!id){
+      id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36);
+      localStorage.setItem("pg_demo_nav",id);
+    }
+    return id;
+  }catch(e){return "sin-almacenamiento-"+Math.random().toString(36).slice(2);}
+}
+function demoYaParticipo(matchId){
+  try{return localStorage.getItem("pg_demo_part_"+matchId)==="1";}catch(e){return false;}
+}
+function demoMarcarParticipo(matchId){
+  try{localStorage.setItem("pg_demo_part_"+matchId,"1");}catch(e){}
+}
+async function montarDemo(){
+  const box=document.getElementById("demo_box");if(!box)return;
+  const r=await edgeCall("demo-ranking",{});
+  if(!r||r.status!=="success"){
+    box.innerHTML='<div style="color:var(--muted);font-size:13px">No pudimos cargar el demo ahora. Intenta de nuevo en unos minutos.</div>';
+    return;
+  }
+  pintarDemo(box,r);
+}
+function pintarDemo(box,r){
+  const p=r.partido;
+  const cta=(texto)=>`<a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:14px">${texto}</a>`;
+  if(!p){
+    box.innerHTML='<div style="color:var(--muted);font-size:13px">Ahora mismo no hay partido en vivo en el demo. Vuelve cuando empiece el siguiente.</div>';
+    return;
+  }
+  const lista=(r.entradas||[]).length?r.entradas.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;${i?"border-top:1px solid var(--faint)":""}">
+      <span style="font-size:20px">${escapeHtml(e.emoji)}</span>
+      <span style="font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(e.apodo)}</span>
+      <span style="font-family:var(--score);font-size:20px;color:var(--gold)">${e.homeScore}–${e.awayScore}</span>
+      ${p.enVivo?"":`<span style="font-size:12px;color:var(--mint);font-weight:700;min-width:48px;text-align:right">+${e.puntos} pts</span>`}
+    </div>`).join(""):'<div style="color:var(--muted);font-size:13px;padding:6px 0">Todavía nadie ha pronosticado este partido. ¡Sé el primero!</div>';
+
+  const cabecera=p.enVivo
+    ?`<div style="color:var(--flare);font-size:12px;font-weight:700;letter-spacing:.06em">🔴 EN VIVO ${p.minute!=null?p.minute+"'":""}</div>`
+    :'<div style="color:var(--mint);font-size:12px;font-weight:700;letter-spacing:.06em">PARTIDO TERMINADO · así quedó el demo 🏆</div>';
+  const marcador=`<div style="font-weight:700;margin-top:6px;font-size:16px">${escapeHtml(p.home)} <span style="font-family:var(--score);font-size:26px;color:var(--gold)">${p.homeScore}–${p.awayScore}</span> ${escapeHtml(p.away)}</div>`;
+
+  if(!p.enVivo){
+    box.innerHTML=`${cabecera}${marcador}<div style="margin-top:12px">${lista}</div>
+      <div style="color:var(--muted);font-size:12.5px;margin-top:12px">Así se gana en Predigoles: +1 por acertar el ganador o el empate, +2 extra por marcador exacto.</div>
+      ${cta("Crea tu grupo y reta a tus amigos →")}`;
+    return;
+  }
+
+  if(demoYaParticipo(p.matchId)){
+    box.innerHTML=`${cabecera}${marcador}
+      <div style="margin-top:12px;font-size:14px">Ya participaste en este partido. ¿Quieres jugar en serio con tu grupo?</div>
+      ${cta("Crea tu grupo →")}
+      <div style="margin-top:14px">${lista}</div>`;
+    return;
+  }
+
+  const emojis=DEMO_EMOJIS.map((em,i)=>`<button type="button" class="demo-emoji" data-emoji="${em}" style="font-size:22px;background:${i?"var(--panel2)":"var(--raise)"};border:1px solid var(--faint);border-radius:12px;width:48px;height:48px;cursor:pointer">${em}</button>`).join("");
+  const opcionesMarcador=Array.from({length:10},(_,n)=>`<option value="${n}">${n}</option>`).join("");
+  box.innerHTML=`${cabecera}${marcador}
+    <div style="background:rgba(255,200,69,.08);border:1px solid rgba(255,200,69,.3);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px">🎮 Demo: aquí puedes pronosticar un partido que ya empezó. En la app real, los pronósticos cierran 1 minuto antes del inicio.</div>
+    <label class="field" style="margin-top:12px">Tu apodo</label>
+    <input class="input" id="demo_apodo" maxlength="20" placeholder="Hincha26">
+    <div style="color:var(--muted);font-size:11.5px;margin-top:6px">Usa un apodo, no tu apellido. Tu apodo se verá públicamente en esta página. No pedimos correo ni teléfono.</div>
+    <label class="field" style="margin-top:12px">Tu emoji</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${emojis}</div>
+    <label class="field" style="margin-top:12px">Tu pronóstico</label>
+    <div style="display:flex;align-items:center;gap:10px">
+      <select class="select-popup" id="demo_home" style="width:auto;margin:0">${opcionesMarcador}</select>
+      <span style="color:var(--muted)">–</span>
+      <select class="select-popup" id="demo_away" style="width:auto;margin:0">${opcionesMarcador}</select>
+      <span style="color:var(--muted);font-size:12px">${escapeHtml(p.home)} – ${escapeHtml(p.away)}</span>
+    </div>
+    <div id="demo_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+    <button class="btn" id="demo_enviar" style="margin-top:6px">Participar</button>
+    <div style="margin-top:16px">${lista}</div>`;
+
+  let emojiSel=DEMO_EMOJIS[0];
+  box.querySelectorAll(".demo-emoji").forEach(b=>{
+    b.onclick=()=>{
+      emojiSel=b.dataset.emoji;
+      box.querySelectorAll(".demo-emoji").forEach(x=>x.style.background=x===b?"var(--raise)":"var(--panel2)");
+    };
+  });
+  document.getElementById("demo_enviar").onclick=()=>{
+    const err=document.getElementById("demo_err");
+    const apodo=document.getElementById("demo_apodo").value.trim();
+    if(!apodo){err.textContent="Escribe un apodo.";return;}
+    conCargando(document.getElementById("demo_enviar"),async()=>{
+      const res=await edgeCall("demo-pronosticar",{
+        apodo,emoji:emojiSel,
+        homeScore:Number(document.getElementById("demo_home").value),
+        awayScore:Number(document.getElementById("demo_away").value),
+        navegadorId:demoNavegadorId(),
+      });
+      if(res&&res.status==="success"){
+        demoMarcarParticipo(p.matchId);
+        try{fbq("track","Lead");}catch(e){}
+        toast("¡Listo! Tu pronóstico ya está en el demo.",false,3000);
+        montarDemo();
+      }else if(res&&res.status==="ya_participo"){
+        demoMarcarParticipo(p.matchId);
+        montarDemo();
+      }else{
+        err.textContent=(res&&res.message)||"No se pudo enviar. Intenta de nuevo.";
+      }
+    },"Enviando...");
+  };
 }
 
 // Heurística de país por zona horaria del navegador -- ninguna liga ata a
