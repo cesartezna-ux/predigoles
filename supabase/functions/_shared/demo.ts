@@ -54,7 +54,20 @@ const PRIO_EQUIPO_PUNTOS = 10;
 // Para "siguiente prueba": partidos que empiezan dentro de esta ventana compiten por prioridad.
 const VENTANA_SIGUIENTE_MS = 6 * 60 * 60 * 1000;
 
+// Partidos destacados a mano para un día concreto: ganan siempre sobre la regla
+// general. Se desactivan solos al cerrar la ventana (hasta), no hace falta quitarlos.
+const DESTACADOS = [
+  { torneoId: "nations_league_2026_27", equipos: ["croatia", "spain"], desde: "2026-10-06T05:00:00Z", hasta: "2026-10-07T05:00:00Z" },
+];
+const PUNTAJE_DESTACADO = 1000;
+
 export function puntajeAudiencia(torneoId: string, home: string, away: string): number {
+  const ahora = Date.now();
+  const nombres = sinTildes(`${home} ${away}`);
+  for (const d of DESTACADOS) {
+    if (d.torneoId === torneoId && d.equipos.every((e) => nombres.includes(e)) &&
+        ahora >= Date.parse(d.desde) && ahora < Date.parse(d.hasta)) return PUNTAJE_DESTACADO;
+  }
   let s = PRIO_TORNEO[torneoId] ?? PRIO_TORNEO_DEFAULT;
   for (const equipo of [home, away]) {
     const n = sinTildes(equipo);
