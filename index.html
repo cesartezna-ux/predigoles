@@ -59,7 +59,6 @@ src="https://www.facebook.com/tr?id=4601108483445142&ev=PageView&noscript=1"
   a{color:var(--mint)}
   header{padding:22px 2px 12px;position:relative}
   .topfijo{position:sticky;top:0;z-index:30;background:var(--pitch);padding-bottom:4px}
-  .topfijo.noFijo{position:static}
   .kicker{font:600 11px/1 var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--mint)}
   h1{font-family:var(--display);font-weight:400;margin:6px 0 2px;font-size:clamp(34px,9vw,52px);line-height:.92;letter-spacing:.5px;text-transform:uppercase}
   h1 .yr{color:var(--gold);-webkit-text-stroke:0}
@@ -1621,31 +1620,21 @@ function renderSetup(){
   };
 }
 
-// Variante de prueba A/B de la landing: /?home=1&v=b. Sin v, se sirve la A (actual).
-const VARIANTE_B=new URLSearchParams(location.search).get("v")==="b";
-const DEMO_BLOCK=`
-    <div class="sectionlbl">Pruébalo ahora · demo</div>
-    <div class="orglist" id="demo_box" style="padding:14px"><div style="color:var(--muted);font-size:13px">${VARIANTE_B?"Preparando el partido de prueba…":"Cargando el demo…"}</div></div>
-
-`;
 function renderLanding(){
   const root=document.getElementById("root");
   const torneosChips=Object.entries(TOURNAMENTS).map(([id,t])=>`<span class="chip">${LANDING_BANDERAS[id]||"🏆"} ${escapeHtml(t.nombre)}</span>`).join("");
   root.innerHTML=`
-    <div class="topfijo${VARIANTE_B?" noFijo":""}">
+    <div class="topfijo">
       <div class="kicker">PREDIGOLES</div>
       <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
       <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
 
       <div id="landing_live"></div>
 
-      ${VARIANTE_B?`<a class="btn" href="#demo_box" onclick="fbq('trackCustom','DemoVerClick')" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🎮 Pruébalo gratis en 30 segundos</a>
-      <a class="smallbtn full" href="/setup" onclick="fbq('track','InitiateCheckout')" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box;margin-top:10px">🚀 Quiero mi quiniela</a>
-      <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$30.000 COP por todo el grupo · menos de $3.000 por persona si son 10</div>`:`<a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
-      <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$30.000 COP · pago único por grupo, sin cobros por jugador</div>`}
+      <a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+      <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$30.000 COP por todo el grupo · menos de $3.000 por persona si son 10</div>
     </div>
 
-    ${VARIANTE_B?DEMO_BLOCK:""}
     <div class="rules" style="margin-top:22px">
       <div><b>⚡ Resultados en tiempo real</b> — los marcadores se sincronizan solos, nadie los digita a mano.</div>
       <div style="margin-top:10px"><b>🎮 Interfaz estilo videojuego</b> — diseño oscuro, rápido y pensado para el celular.</div>
@@ -1656,7 +1645,10 @@ function renderLanding(){
     <div class="sectionlbl">Torneos cubiertos</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">${torneosChips}</div>
 
-${VARIANTE_B?"":DEMO_BLOCK}    <div class="sectionlbl">Reglas del juego</div>
+    <div class="sectionlbl">Pruébalo ahora · demo</div>
+    <div class="orglist" id="demo_box" style="padding:14px"><div style="color:var(--muted);font-size:13px">Cargando el demo…</div></div>
+
+    <div class="sectionlbl">Reglas del juego</div>
     <div class="orglist">
       <div style="padding:14px"><span class="pill">+1</span> <span style="color:var(--muted);font-size:13px">si aciertas quién gana (o el empate).</span></div>
       <div style="padding:14px;border-top:1px solid var(--faint)"><span class="pill">+2</span> <span style="color:var(--muted);font-size:13px">extra si además clavas el marcador exacto (máximo <b style="color:var(--gold)">3</b> puntos por partido).</span></div>
@@ -1772,7 +1764,7 @@ function proximaPruebaHtml(n){
 }
 async function pintarDemo(box,r){
   const p=r.partido;
-  const cta=(texto)=>`<a class="btn" href="/setup" ${VARIANTE_B?"":'target="_blank" rel="noopener"'} onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:14px">${texto}</a>`;
+  const cta=(texto)=>`<a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:14px">${texto}</a>`;
   if(!p){
     const prox=proximaPruebaHtml(r.proxima);
     box.innerHTML=`<div style="color:var(--muted);font-size:13px">Ahora mismo no hay partido en vivo en el demo. Vuelve cuando empiece el siguiente.</div>${prox}`;
