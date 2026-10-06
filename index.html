@@ -1752,13 +1752,24 @@ async function montarDemo(){
     box.innerHTML='<div style="color:var(--muted);font-size:13px">No pudimos cargar el demo ahora. Intenta de nuevo en unos minutos.</div>';
     return;
   }
-  pintarDemo(box,r);
+  await pintarDemo(box,r);
 }
-function pintarDemo(box,r){
+/* Próxima prueba: el partido más cercano de cualquier liga cubierta (sin
+   priorizar la liga de la zona horaria, para que la prueba sea pronto). El
+   demo solo acepta pronósticos mientras el partido está en vivo. */
+async function proximaPruebaHtml(){
+  const rows=await restCall(`fixtures?kickoff=gt.${encodeURIComponent(new Date().toISOString())}&select=torneo_id,home,away,kickoff&order=kickoff.asc&limit=1`);
+  if(!rows||!rows.length)return "";
+  const n=rows[0];
+  const torneoNombre=(TOURNAMENTS[n.torneo_id]||{}).nombre||n.torneo_id;
+  return `<div style="margin-top:14px;font-size:13px;color:var(--muted)">📅 Siguiente prueba: <b style="color:var(--line)">${escapeHtml(n.home)} vs ${escapeHtml(n.away)}</b> · ${fmtFechaCorta(n.kickoff)} · ${FT.format(new Date(n.kickoff))} · ${escapeHtml(torneoNombre)}</div>`;
+}
+async function pintarDemo(box,r){
   const p=r.partido;
   const cta=(texto)=>`<a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:14px">${texto}</a>`;
   if(!p){
-    box.innerHTML='<div style="color:var(--muted);font-size:13px">Ahora mismo no hay partido en vivo en el demo. Vuelve cuando empiece el siguiente.</div>';
+    const prox=await proximaPruebaHtml();
+    box.innerHTML=`<div style="color:var(--muted);font-size:13px">Ahora mismo no hay partido en vivo en el demo. Vuelve cuando empiece el siguiente.</div>${prox}`;
     return;
   }
   const lista=(r.entradas||[]).length?r.entradas.map((e,i)=>`
@@ -1775,9 +1786,10 @@ function pintarDemo(box,r){
   const marcador=`<div style="font-weight:700;margin-top:6px;font-size:16px">${escapeHtml(p.home)} <span style="font-family:var(--score);font-size:26px;color:var(--gold)">${p.homeScore}–${p.awayScore}</span> ${escapeHtml(p.away)}</div>`;
 
   if(!p.enVivo){
+    const prox=await proximaPruebaHtml();
     box.innerHTML=`${cabecera}${marcador}<div style="margin-top:12px">${lista}</div>
       <div style="color:var(--muted);font-size:12.5px;margin-top:12px">Así se gana en Predigoles: +1 por acertar el ganador o el empate, +2 extra por marcador exacto.</div>
-      ${cta("Crea tu grupo y reta a tus amigos →")}`;
+      ${cta("Crea tu grupo y reta a tus amigos →")}${prox}`;
     return;
   }
 
