@@ -3,7 +3,7 @@
 // pronósticos sin puntos; cuando termina, calcula el ranking.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleOptions, jsonOut } from "../_shared/cors.ts";
-import { CUPO_POR_PARTIDO, partidoDemo, puntos } from "../_shared/demo.ts";
+import { CUPO_POR_PARTIDO, partidoDemo, puntos, siguientePrueba } from "../_shared/demo.ts";
 import { errOut } from "../_shared/errOut.ts";
 
 Deno.serve(async (req: Request) => {
@@ -17,7 +17,8 @@ Deno.serve(async (req: Request) => {
     );
 
     const partido = await partidoDemo(db);
-    if (!partido) return jsonOut({ status: "success", partido: null, entradas: [], cupo: 300, participantes: 0 });
+    const proxima = await siguientePrueba(db);
+    if (!partido) return jsonOut({ status: "success", partido: null, proxima, entradas: [], cupo: 300, participantes: 0 });
 
     const { data, error } = await db
       .from("demo_pronosticos")
@@ -50,6 +51,7 @@ Deno.serve(async (req: Request) => {
         minute: partido.minute,
         enVivo: partido.enVivo,
       },
+      proxima,
       entradas,
       participantes: entradas.length,
       cupo: CUPO_POR_PARTIDO,
