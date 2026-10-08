@@ -41,11 +41,13 @@ src="https://www.facebook.com/tr?id=4601108483445142&ev=PageView&noscript=1"
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="/marca/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/marca/apple-touch-icon.png">
 <style>
   :root{
-    --pitch:#0a1c15; --panel:#0f2a20; --panel2:#123524; --raise:#16402e;
-    --line:#eaf3ec; --muted:#83a294; --faint:rgba(234,243,236,.10);
-    --gold:#ffc845; --gold2:#d99a1f; --flare:#ff4d6d; --mint:#36e0bf;
+    --pitch:#0e2417; --panel:#0f2a20; --panel2:#123524; --raise:#16402e;
+    --line:#f4f4ed; --muted:#83a294; --faint:rgba(234,243,236,.10);
+    --gold:#f7c231; --gold2:#d99a1f; --flare:#ff4d6d; --mint:#36e0bf;
     --display:'Anton',sans-serif; --score:'Teko',sans-serif; --body:'Inter',system-ui,sans-serif;
     --r:16px;
   }
@@ -60,6 +62,11 @@ src="https://www.facebook.com/tr?id=4601108483445142&ev=PageView&noscript=1"
   header{padding:22px 2px 12px;position:relative}
   .topfijo{position:sticky;top:0;z-index:30;background:var(--pitch);padding-bottom:4px}
   .kicker{font:600 11px/1 var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--mint)}
+  .brandlock{display:flex;align-items:center;gap:10px}
+  .brandlock img{width:22px;height:22px;border-radius:50%;flex:0 0 auto}
+  .brandlock.lg img{width:40px;height:40px}
+  .brandlock .word{font-family:var(--display);font-size:20px;letter-spacing:.02em;text-transform:uppercase;color:var(--line)}
+  .brandlock .word b{color:var(--gold);font-weight:inherit}
   h1{font-family:var(--display);font-weight:400;margin:6px 0 2px;font-size:clamp(34px,9vw,52px);line-height:.92;letter-spacing:.5px;text-transform:uppercase}
   h1 .yr{color:var(--gold);-webkit-text-stroke:0}
   .sub{color:var(--muted);font-size:13px;margin-top:4px}
@@ -1483,7 +1490,7 @@ function renderSetup(){
   if(new URLSearchParams(location.search).get("pago")==="1"){
     const ref=new URLSearchParams(location.search).get("ref");
     root.innerHTML=`
-      <div class="kicker">PREDIGOLES</div>
+      <div class="brandlock"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
       <div class="card" style="max-width:100%;margin-top:20px" id="pago_card">
         <div class="kicker" style="color:var(--mint)">Un momento...</div>
         <h2>Confirmando tu pago</h2>
@@ -1530,7 +1537,7 @@ function renderSetup(){
     </label>`).join("");
   }
   root.innerHTML=`
-    <div class="kicker">PREDIGOLES</div>
+    <div class="brandlock"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
     <h1>Activa <span class="yr">tu quiniela</span></h1>
     <p class="sub">Cuéntanos cómo quieres tu grupo para activarlo.</p>
     <div class="card" style="max-width:100%;margin-top:20px">
@@ -1625,7 +1632,7 @@ function renderLanding(){
   const torneosChips=Object.entries(TOURNAMENTS).map(([id,t])=>`<span class="chip">${LANDING_BANDERAS[id]||"🏆"} ${escapeHtml(t.nombre)}</span>`).join("");
   root.innerHTML=`
     <div class="topfijo">
-      <div class="kicker">PREDIGOLES</div>
+      <div class="brandlock lg"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
       <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
       <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
 
@@ -2378,7 +2385,7 @@ function renderPanelCentralMain(){
   const panesHtml=PC_tab==="grupos"?gruposPaneHtml:PC_tab==="solicitudes"?solicitudesPaneHtml:comentariosPaneHtml;
 
   pcCard(`
-    <div class="kicker" style="color:var(--mint);margin-bottom:2px">PREDIGOLES</div>
+    <div class="brandlock" style="margin-bottom:2px"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <h1 style="font-family:var(--display);font-size:28px;margin:0;text-transform:uppercase">Panel Central</h1>
       <button class="link-btn" id="pc_salir">salir</button>
