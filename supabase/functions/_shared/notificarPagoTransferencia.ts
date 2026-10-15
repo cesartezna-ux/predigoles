@@ -3,6 +3,7 @@
 // nadie nos avisa solo cuando esa plata llega, así que el primer paso es
 // que el admin maestro se entere de que hay algo que revisar en el banco.
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { asciiSeguro } from "./asciiSeguro.ts";
 
 export type NotificarTransferenciaInput = {
   solicitudId: string;
@@ -36,10 +37,9 @@ export async function notificarPagoTransferencia(input: NotificarTransferenciaIn
   const celularAdmin = String(input.celularAdmin || "").trim();
   const torneoId = String(input.torneoId || "").trim();
 
-  // El asunto no pasa por la misma decodificación que el cuerpo del correo en
-  // Titan (GoDaddy) -- un guion largo aquí se mostró sin decodificar en la
-  // bandeja. Guion normal, sin ese riesgo.
-  const asunto = `Nueva solicitud por transferencia - "${nombreGrupo}" (${input.grupoId})`;
+  // asciiSeguro(): el nombre del grupo lo escribe el comprador y puede
+  // traer tildes/eñe -- el asunto se manda sin codificar (ver ese archivo).
+  const asunto = asciiSeguro(`Nueva solicitud por transferencia - "${nombreGrupo}" (${input.grupoId})`);
 
   const texto = crlf(`Hay una solicitud nueva esperando pago por transferencia (Bre-B).
 

@@ -4,6 +4,7 @@
 // grupo, mientras el PIN en texto plano todavía existe en memoria (nunca se
 // vuelve a tener después de este momento -- solo queda el hash).
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { asciiSeguro } from "./asciiSeguro.ts";
 
 export type NotificarAdminInput = {
   grupoId: string;
@@ -40,11 +41,10 @@ export async function notificarAdminPorCorreo(input: NotificarAdminInput): Promi
 
   const link = `https://www.predigoles.com/?grupo=${input.grupoId}`;
   const saludo = admin ? `¡Hola, ${admin}!` : "¡Hola!";
-  // Guion normal, no largo: el asunto no pasa por la misma decodificación
-  // que el cuerpo en Titan (GoDaddy) -- un guion largo aquí se mostró sin
-  // decodificar en la bandeja (detectado probando notificarPagoTransferencia,
-  // que comparte el mismo patrón de envío).
-  const asunto = `Tu quiniela "${nombre}" ya está lista - Predigoles`;
+  // asciiSeguro() porque el asunto se manda sin codificar (ver ese archivo) --
+  // "nombre" lo pone el comprador y puede traer tildes/eñe sin que se note
+  // hasta que llega como "=?utf-8?Q?...?=" sin decodificar en la bandeja.
+  const asunto = asciiSeguro(`Tu quiniela "${nombre}" ya esta lista - Predigoles`);
 
   const texto = crlf(`${saludo}
 
