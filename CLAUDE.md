@@ -54,6 +54,15 @@ Dos capas de PIN separadas:
 - **Admin maestro/central** (César): `MASTER_PIN_HASH`, un secreto de Supabase (`Deno.env.get("MASTER_PIN_HASH")` dentro de `checkMasterAuth`) — nunca vive en una tabla. Protege `admin-listar-grupos` / `admin-provisionar-grupo` / `admin-actualizar-pago` / `admin-resetear-pin`. Se llega desde el frontend vía `?admin=central` → `bootPanelCentral()`.
 - Un grupo debe provisionarse vía `admin-provisionar-grupo` antes de poder usarse — no existe autoconfiguración espontánea.
 
+### Compra y pago (`/setup` → `group_requests`)
+
+`solicitar-grupo` (pública) valida el formulario de `/setup` y guarda la solicitud en `group_requests` — **no sabe nada de la pasarela de pago**, solo de los datos del grupo. El comprador elige el método de pago (`metodo_pago`: `wompi` | `transferencia`) ahí mismo, antes de enviar:
+
+- **Tarjeta (Wompi, automático):** `crear-pago-wompi` arma el checkout firmado; `wompi-webhook` confirma el pago, llama a `provisionarGrupo` + `notificarAdminPorCorreo` (`_shared/`) y crea el grupo sin ningún clic del admin. `estado-pago-solicitud` deja que el frontend confirme contra el servidor antes de decir "gracias por tu compra" — nunca solo por haber vuelto de la URL de pago.
+- **Transferencia (Bre-B, manual):** sin webhook — nadie nos avisa cuando llega la plata. `solicitar-grupo` manda un correo a contacto@predigoles.com (`_shared/notificarPagoTransferencia.ts`) con los datos de la solicitud; el comprador ve el QR (`marca/bre-b-qr.png`, el oficial de Bancolombia para la llave Bre-B de Tezna & Asociados, 902103446) y el mismo ID de grupo como concepto sugerido, para poder cruzarlo a mano contra la app del banco. El admin maestro marca el pago (`admin-marcar-solicitud-pagada`) y crea el grupo desde Panel Central (botón "➕ Crear grupo con estos datos") — el mismo camino manual que ya existía para Gumroad. Panel Central marca estas solicitudes con un badge "🏦 TRANSFERENCIA — revisar banco" para que no se confundan con las automáticas.
+
+Ambos caminos conviven en la misma tabla; `estado_pago` (pagado/pendiente) es independiente de `estado` (atendida/pendiente, si el admin ya creó el grupo).
+
 ### Torneos y calendario
 
 `TOURNAMENTS` en `index.html` sigue siendo el catálogo de presentación (copy, `FLAG`, `ESCUDOS`, `EXTRA_ALLOWED`) — sin cambios de forma desde la era de Sheets. El calendario real vive en la tabla compartida `fixtures`, cargado por la Edge Function `cargar-fixture` (protegida con PIN maestro, invocada manualmente por torneo — ver `TORNEOS_SYNC` en `supabase/functions/_shared/torneosSync.ts`).

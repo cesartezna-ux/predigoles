@@ -1564,7 +1564,12 @@ function renderSetup(){
       <label class="field" style="margin-top:10px">PIN que quieres usar (opcional — si lo dejas vacío, te asignamos uno)</label>
       <input class="input" id="st_pin" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:20px;text-align:center">
       <div id="st_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
-      <button class="btn" id="st_enviar" style="margin-top:10px">Enviar solicitud</button>
+      <label class="field" style="margin-top:16px">¿Cómo quieres pagar?</label>
+      <div style="display:flex;gap:10px">
+        <button class="btn" id="st_pagar_tarjeta" style="flex:1">💳 Con tarjeta</button>
+        <button class="btn ghost" id="st_pagar_transferencia" style="flex:1">🏦 Transferencia</button>
+      </div>
+      <div style="color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center">Con tarjeta se activa solo, al instante. Por transferencia lo confirmamos a mano, normalmente el mismo día.</div>
     </div>
   `;
   document.getElementById("st_torneo").onchange=(e)=>{
@@ -1573,7 +1578,7 @@ function renderSetup(){
   document.querySelectorAll('input[name="st_modo"]').forEach(r=>{
     r.onchange=()=>{document.getElementById("st_equipos").style.display=r.value==="equipo"&&r.checked?"block":"none";};
   });
-  document.getElementById("st_enviar").onclick=async()=>{
+  async function enviarSolicitud(metodoPago,btn){
     const err=document.getElementById("st_err");
     const grupoId=document.getElementById("st_id").value.trim();
     const nombreGrupo=document.getElementById("st_nombre").value.trim();
@@ -1591,16 +1596,44 @@ function renderSetup(){
     if(!celularAdmin){err.textContent="Falta tu celular.";return;}
     if(!correoAdmin.includes("@")){err.textContent="Correo inválido.";return;}
     if(pinDeseado&&!/^\d{4}$/.test(pinDeseado)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
-    await conCargando(document.getElementById("st_enviar"),async()=>{
-      const r=await edgeCall("solicitar-grupo",{grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pinDeseado});
+    await conCargando(btn,async()=>{
+      const r=await edgeCall("solicitar-grupo",{grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pinDeseado,metodoPago});
       if(!r||r.status!=="success"){
         err.textContent=(r&&r.message)||"No se pudo enviar. Intenta de nuevo.";
         return;
       }
-      // Si Wompi ya está configurado, pagar es el siguiente paso: se redirige
-      // al Checkout Web de Wompi con una firma calculada en el servidor (ver
-      // crear-pago-wompi). Si todavía no está configurado (pasarela en
-      // proceso de activación), sigue funcionando como hoy -- sin romper el
+
+      if(metodoPago==="transferencia"){
+        // Sin webhook que avise solo (a diferencia de Wompi): se le pide al
+        // comprador que ponga el ID de grupo como concepto, para que el
+        // admin central pueda cruzarlo a mano contra la app del banco. Nada
+        // de "¡listo!" acá -- el pago todavía no está confirmado.
+        root.innerHTML=`<div class="card" style="border-color:rgba(255,200,69,.4);max-width:100%;margin-top:20px">
+          <div class="kicker" style="color:var(--gold)">Un paso más</div>
+          <h2>Paga por transferencia</h2>
+          <p style="color:var(--muted);font-size:14px">Transfiere <b style="color:var(--line)">$30.000 COP</b> a esta llave Bre-B. En el concepto de la transferencia, escribe este código:</p>
+          <div style="text-align:center;margin:14px 0"><span style="display:inline-block;background:var(--raise);border:1px solid var(--faint);border-radius:10px;padding:10px 18px;font:700 20px/1 var(--score);letter-spacing:.05em;color:var(--gold)">${escapeHtml(grupoId)}</span></div>
+          <div style="color:var(--muted);font-size:12px;text-align:center;margin-bottom:10px">¿Estás en el mismo celular? No hace falta escanear — copia la llave y pégala en tu app del banco.</div>
+          <button class="btn ghost" id="st_copiar_llave" style="font:700 18px/1 var(--score);letter-spacing:.05em">📋 Copiar llave 902103446</button>
+          <div style="text-align:center;margin:16px 0 6px;color:var(--muted);font-size:11.5px">— o escanea desde otro dispositivo —</div>
+          <div style="text-align:center"><img src="/marca/bre-b-qr.png" alt="QR Bre-B" style="width:200px;max-width:70%;border-radius:12px;background:#fff;padding:10px"></div>
+          <div style="text-align:center;margin-top:10px;font:600 13px/1 var(--body);color:var(--muted)">Tezna &amp; Asociados SAS</div>
+          <p style="color:var(--muted);font-size:13px;margin-top:16px">Cuando confirmemos tu pago (normalmente el mismo día), te llega un correo a <b style="color:var(--line)">${escapeHtml(correoAdmin)}</b> con el link de tu grupo y el PIN.</p>
+        </div>`;
+        document.getElementById("st_copiar_llave").onclick=async(e)=>{
+          try{
+            await navigator.clipboard.writeText("902103446");
+            toast("Llave copiada ✓");
+          }catch(err){
+            toast("No se pudo copiar. La llave es 902103446.",true);
+          }
+        };
+        return;
+      }
+
+      // Tarjeta: se redirige al Checkout Web de Wompi con una firma calculada
+      // en el servidor (ver crear-pago-wompi). Si la pasarela todavía no está
+      // configurada, sigue funcionando como solicitud manual, sin romper el
       // flujo mientras tanto.
       const pago=await edgeCall("crear-pago-wompi",{solicitudId:r.solicitudId});
       if(pago&&pago.status==="success"){
@@ -1624,7 +1657,9 @@ function renderSetup(){
         <p style="color:var(--muted);font-size:14px">En breve activamos tu grupo y te escribimos a <b style="color:var(--line)">${escapeHtml(correoAdmin)}</b> o <b style="color:var(--line)">${escapeHtml(celularAdmin)}</b> con el link y el PIN.</p>
       </div>`;
     },"Enviando...");
-  };
+  }
+  document.getElementById("st_pagar_tarjeta").onclick=(e)=>enviarSolicitud("wompi",e.target);
+  document.getElementById("st_pagar_transferencia").onclick=(e)=>enviarSolicitud("transferencia",e.target);
 }
 
 function renderLanding(){
@@ -2340,6 +2375,7 @@ function renderPanelCentralMain(){
         <div style="font-weight:700;color:var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           ${escapeHtml(s.nombreGrupo)} <span style="color:var(--muted);font-weight:400">(${escapeHtml(s.grupoId)})</span>
           ${s.estadoPago==="pagado"?'<span style="font-size:11px;font-weight:700;color:var(--mint);background:rgba(54,224,191,.12);border:1px solid rgba(54,224,191,.4);border-radius:999px;padding:2px 8px">✓ PAGADO</span>':'<span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--faint);border-radius:999px;padding:2px 8px">SIN PAGAR</span>'}
+          ${s.metodoPago==="transferencia"?'<span style="font-size:11px;font-weight:700;color:var(--gold);background:rgba(255,200,69,.12);border:1px solid rgba(255,200,69,.4);border-radius:999px;padding:2px 8px">🏦 TRANSFERENCIA — revisar banco</span>':""}
         </div>
         <div style="color:var(--muted);font-size:12.5px;margin-top:4px">
           Torneo: ${escapeHtml((TOURNAMENTS[s.torneoId]||{}).nombre||s.torneoId)} ·

@@ -9,6 +9,7 @@ import { sanitizeTab } from "../_shared/validate.ts";
 import { rateLimitCheck, rateLimitRegistrarFallo } from "../_shared/rateLimit.ts";
 import { TORNEOS_SYNC } from "../_shared/torneosSync.ts";
 import { errOut } from "../_shared/errOut.ts";
+import { notificarPagoTransferencia } from "../_shared/notificarPagoTransferencia.ts";
 
 function limpiarTexto(v: unknown, max: number): string {
   return String(v ?? "").trim().slice(0, max);
@@ -68,6 +69,11 @@ Deno.serve(async (req: Request) => {
     }
     if (!pinDeseado) pinDeseado = null;
 
+    // Wompi es el default por compatibilidad hacia atrás (frontends viejos
+    // que no mandan este campo); "transferencia" es la única otra opción
+    // válida -- cualquier otro valor se descarta en vez de guardarse.
+    const metodoPago = body.metodoPago === "transferencia" ? "transferencia" : "wompi";
+
     // Evita que el comprador reciba "solicitud enviada ✓" con un ID que en
     // realidad ya está tomado -- sin esto, el choque solo se descubre
     // cuando el admin central intenta crear el grupo desde Panel Central
@@ -87,12 +93,35 @@ Deno.serve(async (req: Request) => {
       celular_admin: celularAdmin,
       correo_admin: correoAdmin,
       pin_deseado: pinDeseado,
+      metodo_pago: metodoPago,
     }).select("id").single();
     if (error) return errOut("solicitar-grupo", error);
 
+    // Transferencia no tiene webhook que avise solo cuando llega la plata
+    // (a diferencia de Wompi) -- el primer paso es que el admin maestro se
+    // entere de que hay algo que revisar en el banco. Un fallo de correo
+    // aquí no debe tumbar la solicitud ya guardada -- el comprador igual
+    // necesita ver la pantalla con el QR y las instrucciones.
+    if (metodoPago === "transferencia") {
+      try {
+        await notificarPagoTransferencia({
+          solicitudId: String(data.id),
+          grupoId,
+          nombreGrupo,
+          nombreAdmin,
+          correoAdmin,
+          celularAdmin,
+          torneoId,
+        });
+      } catch (err) {
+        console.error("[solicitar-grupo] No se pudo notificar la solicitud por transferencia:", err);
+      }
+    }
+
     // El frontend necesita este id para pedir el link de pago (crear-pago-wompi)
     // usándolo como referencia -- así el webhook sabe a qué solicitud corresponde
-    // un pago confirmado.
+    // un pago confirmado. Para transferencia, el mismo id identifica la solicitud
+    // que se muestra en Panel Central y se usa como concepto sugerido.
     return jsonOut({ status: "success", solicitudId: data.id });
   } catch (err) {
     return errOut("solicitar-grupo", err);
