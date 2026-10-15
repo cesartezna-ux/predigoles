@@ -36,7 +36,10 @@ export async function notificarPagoTransferencia(input: NotificarTransferenciaIn
   const celularAdmin = String(input.celularAdmin || "").trim();
   const torneoId = String(input.torneoId || "").trim();
 
-  const asunto = `Nueva solicitud por transferencia — "${nombreGrupo}" (${input.grupoId})`;
+  // El asunto no pasa por la misma decodificación que el cuerpo del correo en
+  // Titan (GoDaddy) -- un guion largo aquí se mostró sin decodificar en la
+  // bandeja. Guion normal, sin ese riesgo.
+  const asunto = `Nueva solicitud por transferencia - "${nombreGrupo}" (${input.grupoId})`;
 
   const texto = crlf(`Hay una solicitud nueva esperando pago por transferencia (Bre-B).
 
@@ -52,7 +55,7 @@ El comprador debería haber puesto "${input.grupoId}" como concepto de la transf
       <p><b>Torneo:</b> ${torneoId}</p>
       <p><b>Admin:</b> ${nombreAdmin} · ${celularAdmin} · ${correoAdmin}</p>
       <p>El comprador debería haber puesto <code>${input.grupoId}</code> como concepto de la transferencia — revisa tu app del banco contra ese código.</p>
-      <p>Cuando confirmes el pago, márcalo en <b>Panel Central → Solicitudes</b> y crea el grupo desde ahí.</p>
+      <p>Cuando confirmes el pago, márcalo en <b>Panel Central, pestaña Solicitudes</b>, y crea el grupo desde ahí.</p>
     </div>`);
 
   const client = new SMTPClient({

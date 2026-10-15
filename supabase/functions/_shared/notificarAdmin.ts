@@ -40,7 +40,11 @@ export async function notificarAdminPorCorreo(input: NotificarAdminInput): Promi
 
   const link = `https://www.predigoles.com/?grupo=${input.grupoId}`;
   const saludo = admin ? `¡Hola, ${admin}!` : "¡Hola!";
-  const asunto = `Tu quiniela "${nombre}" ya está lista — Predigoles`;
+  // Guion normal, no largo: el asunto no pasa por la misma decodificación
+  // que el cuerpo en Titan (GoDaddy) -- un guion largo aquí se mostró sin
+  // decodificar en la bandeja (detectado probando notificarPagoTransferencia,
+  // que comparte el mismo patrón de envío).
+  const asunto = `Tu quiniela "${nombre}" ya está lista - Predigoles`;
 
   const texto = crlf(`${saludo}
 
@@ -63,7 +67,7 @@ Guarda este correo -- es la única vez que se envía el PIN de administrador en 
       <p><b>1)</b> Abre el link y crea tu perfil de jugador (tu nombre + un PIN tuyo, el que quieras) -- así quedas participando como uno más. Ese PIN es tuyo, distinto al de administrador.</p>
       <p><b>2)</b> Para entrar como organizador: toca el botón <b>"Organizador"</b> (abajo de la pantalla) e ingresa el PIN de administrador de arriba -- ese sí es el que te acabamos de enviar.</p>
       <p><b>3)</b> Ahí mismo, en el menú, encuentras <b>"Cómo usar Predigoles"</b> con la guía completa (invitar jugadores, reglas del juego, premios, y más).</p>
-      <p style="color:#888;font-size:12px">Guarda este correo — es la única vez que se envía el PIN de administrador en texto plano.</p>
+      <p style="color:#888;font-size:12px">Guarda este correo - es la única vez que se envía el PIN de administrador en texto plano.</p>
     </div>`);
 
   const client = new SMTPClient({
