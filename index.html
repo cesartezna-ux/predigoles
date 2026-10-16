@@ -288,6 +288,7 @@ localStorage.setItem("pg_tab",TAB);
    (La Liga, Libertadores, etc.) es sumar una entrada aquí — no se vuelve a
    tocar la arquitectura ni el multi-tenant. */
 const TOURNAMENT_DEFAULT="fpc_2026_2"; // respaldo para grupos creados ANTES de este catálogo (ej. JorgeLozano)
+const PAGO_TARJETA_HABILITADO=false; // false mientras Wompi está en modo sandbox por validación de datos -- /setup solo ofrece transferencia hasta reactivar esto
 
 const TOURNAMENTS={
   "fpc_2026_2":{
@@ -1566,10 +1567,10 @@ function renderSetup(){
       <div id="st_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
       <label class="field" style="margin-top:16px">¿Cómo quieres pagar?</label>
       <div style="display:flex;gap:10px">
-        <button class="btn" id="st_pagar_tarjeta" style="flex:1">💳 Con tarjeta</button>
-        <button class="btn ghost" id="st_pagar_transferencia" style="flex:1">🏦 Transferencia</button>
+        ${PAGO_TARJETA_HABILITADO?'<button class="btn" id="st_pagar_tarjeta" style="flex:1">💳 Con tarjeta</button>':""}
+        <button class="btn ${PAGO_TARJETA_HABILITADO?"ghost":""}" id="st_pagar_transferencia" style="flex:1">🏦 Transferencia</button>
       </div>
-      <div style="color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center">Con tarjeta se activa solo, al instante. Por transferencia lo confirmamos a mano, normalmente el mismo día.</div>
+      <div style="color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center">${PAGO_TARJETA_HABILITADO?"Con tarjeta se activa solo, al instante. Por transferencia lo confirmamos a mano, normalmente el mismo día.":"Por ahora solo recibimos pago por transferencia -- lo confirmamos a mano, normalmente el mismo día."}</div>
     </div>
   `;
   document.getElementById("st_torneo").onchange=(e)=>{
@@ -1658,7 +1659,7 @@ function renderSetup(){
       </div>`;
     },"Enviando...");
   }
-  document.getElementById("st_pagar_tarjeta").onclick=(e)=>enviarSolicitud("wompi",e.target);
+  if(PAGO_TARJETA_HABILITADO) document.getElementById("st_pagar_tarjeta").onclick=(e)=>enviarSolicitud("wompi",e.target);
   document.getElementById("st_pagar_transferencia").onclick=(e)=>enviarSolicitud("transferencia",e.target);
 }
 
