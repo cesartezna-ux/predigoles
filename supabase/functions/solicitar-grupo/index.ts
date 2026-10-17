@@ -70,9 +70,10 @@ Deno.serve(async (req: Request) => {
     if (!pinDeseado) pinDeseado = null;
 
     // Wompi es el default por compatibilidad hacia atrás (frontends viejos
-    // que no mandan este campo); "transferencia" es la única otra opción
-    // válida -- cualquier otro valor se descarta en vez de guardarse.
-    const metodoPago = body.metodoPago === "transferencia" ? "transferencia" : "wompi";
+    // que no mandan este campo); "transferencia" y "bold" son las otras
+    // opciones válidas -- cualquier otro valor se descarta en vez de
+    // guardarse.
+    const metodoPago = body.metodoPago === "transferencia" ? "transferencia" : body.metodoPago === "bold" ? "bold" : "wompi";
 
     // Evita que el comprador reciba "solicitud enviada ✓" con un ID que en
     // realidad ya está tomado -- sin esto, el choque solo se descubre
