@@ -288,7 +288,7 @@ localStorage.setItem("pg_tab",TAB);
    (La Liga, Libertadores, etc.) es sumar una entrada aquí — no se vuelve a
    tocar la arquitectura ni el multi-tenant. */
 const TOURNAMENT_DEFAULT="fpc_2026_2"; // respaldo para grupos creados ANTES de este catálogo (ej. JorgeLozano)
-const PAGO_TARJETA_HABILITADO=false; // false mientras Wompi está en modo sandbox por validación de datos -- /setup solo ofrece transferencia hasta reactivar esto
+const GATEWAY_TARJETA="wompi"; // null = /setup solo ofrece transferencia (ej. mientras Wompi está en sandbox); "wompi" o "bold" = pasarela activa para el botón de tarjeta
 
 const TOURNAMENTS={
   "fpc_2026_2":{
@@ -1567,10 +1567,10 @@ function renderSetup(){
       <div id="st_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
       <label class="field" style="margin-top:16px">¿Cómo quieres pagar?</label>
       <div style="display:flex;gap:10px">
-        ${PAGO_TARJETA_HABILITADO?'<button class="btn" id="st_pagar_tarjeta" style="flex:1">💳 Con tarjeta</button>':""}
-        <button class="btn ${PAGO_TARJETA_HABILITADO?"ghost":""}" id="st_pagar_transferencia" style="flex:1">🏦 Transferencia</button>
+        ${GATEWAY_TARJETA?'<button class="btn" id="st_pagar_tarjeta" style="flex:1">💳 Con tarjeta</button>':""}
+        <button class="btn ${GATEWAY_TARJETA?"ghost":""}" id="st_pagar_transferencia" style="flex:1">🏦 Transferencia</button>
       </div>
-      <div style="color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center">${PAGO_TARJETA_HABILITADO?"Con tarjeta se activa solo, al instante. Por transferencia lo confirmamos a mano, normalmente el mismo día.":"Por ahora solo recibimos pago por transferencia -- lo confirmamos a mano, normalmente el mismo día."}</div>
+      <div style="color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center">${GATEWAY_TARJETA?"Con tarjeta se activa solo, al instante. Por transferencia lo confirmamos a mano, normalmente el mismo día.":"Por ahora solo recibimos pago por transferencia -- lo confirmamos a mano, normalmente el mismo día."}</div>
     </div>
   `;
   document.getElementById("st_torneo").onchange=(e)=>{
@@ -1632,25 +1632,35 @@ function renderSetup(){
         return;
       }
 
-      // Tarjeta: se redirige al Checkout Web de Wompi con una firma calculada
-      // en el servidor (ver crear-pago-wompi). Si la pasarela todavía no está
-      // configurada, sigue funcionando como solicitud manual, sin romper el
-      // flujo mientras tanto.
-      const pago=await edgeCall("crear-pago-wompi",{solicitudId:r.solicitudId});
-      if(pago&&pago.status==="success"){
-        const params=new URLSearchParams({
-          "public-key":pago.publicKey,
-          "currency":pago.currency,
-          "amount-in-cents":String(pago.amountInCents),
-          "reference":pago.reference,
-          "signature:integrity":pago.signature,
-          "redirect-url":pago.redirectUrl,
-          "customer-data:email":correoAdmin,
-          "customer-data:full-name":nombreAdmin,
-          "customer-data:phone-number":celularAdmin,
-        });
-        location.href=pago.checkoutUrl+"?"+params.toString();
-        return;
+      // Tarjeta: cada pasarela tiene su propio contrato de Edge Function.
+      // Wompi exige armar la firma de integridad en el querystring del
+      // checkout (ver crear-pago-wompi); Bold ya devuelve una URL de
+      // checkout lista para usar (ver crear-pago-bold), sin nada que
+      // propagar al cliente. Si la pasarela todavía no está configurada,
+      // sigue funcionando como solicitud manual, sin romper el flujo.
+      if(metodoPago==="bold"){
+        const pago=await edgeCall("crear-pago-bold",{solicitudId:r.solicitudId});
+        if(pago&&pago.status==="success"&&pago.checkoutUrl){
+          location.href=pago.checkoutUrl;
+          return;
+        }
+      }else if(metodoPago==="wompi"){
+        const pago=await edgeCall("crear-pago-wompi",{solicitudId:r.solicitudId});
+        if(pago&&pago.status==="success"){
+          const params=new URLSearchParams({
+            "public-key":pago.publicKey,
+            "currency":pago.currency,
+            "amount-in-cents":String(pago.amountInCents),
+            "reference":pago.reference,
+            "signature:integrity":pago.signature,
+            "redirect-url":pago.redirectUrl,
+            "customer-data:email":correoAdmin,
+            "customer-data:full-name":nombreAdmin,
+            "customer-data:phone-number":celularAdmin,
+          });
+          location.href=pago.checkoutUrl+"?"+params.toString();
+          return;
+        }
       }
       root.innerHTML=`<div class="card" style="border-color:var(--mint);max-width:100%;margin-top:20px">
         <div class="kicker" style="color:var(--mint)">Solicitud enviada ✓</div>
@@ -1659,7 +1669,7 @@ function renderSetup(){
       </div>`;
     },"Enviando...");
   }
-  if(PAGO_TARJETA_HABILITADO) document.getElementById("st_pagar_tarjeta").onclick=(e)=>enviarSolicitud("wompi",e.target);
+  if(GATEWAY_TARJETA) document.getElementById("st_pagar_tarjeta").onclick=(e)=>enviarSolicitud(GATEWAY_TARJETA,e.target);
   document.getElementById("st_pagar_transferencia").onclick=(e)=>enviarSolicitud("transferencia",e.target);
 }
 
