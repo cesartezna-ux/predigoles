@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
       .from("group_requests")
       .update({ estado_pago: "pagado", wompi_transaction_id: String(tx.id ?? "") })
       .eq("id", String(tx.reference))
-      .select("id, estado, grupo_id, nombre_grupo, torneo_id, modo_seguimiento, equipos_seguidos, nombre_admin, celular_admin, correo_admin, pin_deseado")
+      .select("id, estado, grupo_id, nombre_grupo, torneo_id, modo_seguimiento, equipos_seguidos, nombre_admin, celular_admin, correo_admin, ciudad_admin, pin_deseado")
       .maybeSingle();
     if (error) return errOut("wompi-webhook", error);
 
@@ -101,6 +101,7 @@ Deno.serve(async (req: Request) => {
           nombreAdmin: solicitud.nombre_admin,
           celularAdmin: solicitud.celular_admin,
           correoAdmin: solicitud.correo_admin,
+          ciudadAdmin: solicitud.ciudad_admin,
           pin: solicitud.pin_deseado,
           estadoPago: "Pagado",
         });

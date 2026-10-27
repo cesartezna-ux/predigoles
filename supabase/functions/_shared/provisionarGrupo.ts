@@ -22,6 +22,7 @@ export type ProvisionarGrupoInput = {
   nombreAdmin: unknown;
   celularAdmin: unknown;
   correoAdmin: unknown;
+  ciudadAdmin: unknown;
   pin: unknown;
   estadoPago: unknown;
 };
@@ -70,6 +71,7 @@ export async function provisionarGrupo(
     admin_nombre: input.nombreAdmin || null,
     admin_celular: input.celularAdmin || null,
     admin_correo: input.correoAdmin || null,
+    admin_ciudad: input.ciudadAdmin || null,
     estado_pago: input.estadoPago || "Pendiente",
   });
   if (errGrupo) throw errGrupo;

@@ -16,7 +16,7 @@ Deno.serve(async (req: Request) => {
   try {
     const {
       masterPin, grupoId, nombreGrupo, torneoId, modoSeguimiento, equiposSeguidos,
-      nombreAdmin, celularAdmin, correoAdmin, pin, estadoPago,
+      nombreAdmin, celularAdmin, correoAdmin, ciudadAdmin, pin, estadoPago,
     } = await req.json();
 
     const db = createClient(
@@ -29,7 +29,7 @@ Deno.serve(async (req: Request) => {
 
     const resultado = await provisionarGrupo(db, {
       grupoId, nombreGrupo, torneoId, modoSeguimiento, equiposSeguidos,
-      nombreAdmin, celularAdmin, correoAdmin, pin, estadoPago,
+      nombreAdmin, celularAdmin, correoAdmin, ciudadAdmin, pin, estadoPago,
     });
     return jsonOut(resultado);
   } catch (err) {

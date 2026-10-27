@@ -1558,6 +1558,8 @@ function renderSetup(){
       <div id="st_equipos" style="margin-top:10px;max-height:180px;overflow-y:auto;display:none">${listaEquiposHtml(TOURNAMENT_DEFAULT)}</div>
       <label class="field" style="margin-top:14px">Tu nombre (administrador del grupo)</label>
       <input class="input" id="st_admin_nombre" maxlength="60" placeholder="Nombre de contacto">
+      <label class="field" style="margin-top:10px">Tu ciudad</label>
+      <input class="input" id="st_admin_ciudad" maxlength="60" placeholder="Ej: Bogotá">
       <label class="field" style="margin-top:10px">Tu celular</label>
       <input class="input" id="st_admin_cel" maxlength="20" placeholder="Ej: 3001234567">
       <label class="field" style="margin-top:10px">Tu correo</label>
@@ -1625,6 +1627,7 @@ function renderSetup(){
     const modoSeguimiento=document.querySelector('input[name="st_modo"]:checked').value;
     const equiposSeguidos=[...document.querySelectorAll(".st_eq:checked")].map(cb=>cb.value);
     const nombreAdmin=document.getElementById("st_admin_nombre").value.trim();
+    const ciudadAdmin=document.getElementById("st_admin_ciudad").value.trim();
     const celularAdmin=document.getElementById("st_admin_cel").value.trim();
     const correoAdmin=document.getElementById("st_admin_correo").value.trim();
     const pinDeseado=document.getElementById("st_pin").value.trim();
@@ -1632,11 +1635,12 @@ function renderSetup(){
     if(!nombreGrupo){err.textContent="Falta el nombre del grupo.";return;}
     if(modoSeguimiento==="equipo"&&!equiposSeguidos.length){err.textContent="Elige al menos un equipo, o marca \"el torneo completo\".";return;}
     if(!nombreAdmin){err.textContent="Falta tu nombre.";return;}
+    if(!ciudadAdmin){err.textContent="Falta tu ciudad.";return;}
     if(!celularAdmin){err.textContent="Falta tu celular.";return;}
     if(!correoAdmin.includes("@")){err.textContent="Correo inválido.";return;}
     if(pinDeseado&&!/^\d{4}$/.test(pinDeseado)){err.textContent="El PIN debe ser de 4 dígitos, o déjalo vacío.";return;}
     await conCargando(btn,async()=>{
-      const r=await edgeCall("solicitar-grupo",{grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,pinDeseado,metodoPago});
+      const r=await edgeCall("solicitar-grupo",{grupoId,nombreGrupo,torneoId,modoSeguimiento,equiposSeguidos,nombreAdmin,celularAdmin,correoAdmin,ciudadAdmin,pinDeseado,metodoPago});
       if(!r||r.status!=="success"){
         err.textContent=(r&&r.message)||"No se pudo enviar. Intenta de nuevo.";
         return;
@@ -2395,7 +2399,7 @@ function renderPanelCentralMain(){
           ID: <b style="color:var(--line)">${escapeHtml(g.grupoId)}</b> ·
           Torneo: ${escapeHtml((TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId)} ·
           Creado: ${fmtFechaCorta(g.fechaCreacion)}<br>
-          Admin: ${escapeHtml(g.nombreAdmin||"—")} · ${escapeHtml(g.celularAdmin||"—")} · ${escapeHtml(g.correoAdmin||"—")}
+          Admin: ${escapeHtml(g.nombreAdmin||"—")} · ${escapeHtml(g.ciudadAdmin||"—")} · ${escapeHtml(g.celularAdmin||"—")} · ${escapeHtml(g.correoAdmin||"—")}
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
           <a href="${location.origin}/?grupo=${encodeURIComponent(g.grupoId)}" target="_blank" class="link-btn" style="text-decoration:none;color:var(--mint)">🔗 Abrir grupo</a>
@@ -2431,7 +2435,7 @@ function renderPanelCentralMain(){
         <div style="color:var(--muted);font-size:12.5px;margin-top:4px">
           Torneo: ${escapeHtml((TOURNAMENTS[s.torneoId]||{}).nombre||s.torneoId)} ·
           ${s.modoSeguimiento==="equipo"?"Equipos: "+escapeHtml((s.equiposSeguidos||[]).join(", ")):"Todo el torneo"}<br>
-          Admin: ${escapeHtml(s.nombreAdmin)} · ${escapeHtml(s.celularAdmin)} · ${escapeHtml(s.correoAdmin)}<br>
+          Admin: ${escapeHtml(s.nombreAdmin)} · ${escapeHtml(s.ciudadAdmin||"—")} · ${escapeHtml(s.celularAdmin)} · ${escapeHtml(s.correoAdmin)}<br>
           PIN deseado: ${s.pinDeseado?escapeHtml(s.pinDeseado):"(sin preferencia)"} · Pedido: ${fmtFechaCorta(s.fechaSolicitud)}
         </div>
         <div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap">
@@ -2489,8 +2493,8 @@ function renderPanelCentralMain(){
   const btnExpGrupos=document.getElementById("pc_exportar_grupos");
   if(btnExpGrupos)btnExpGrupos.onclick=()=>{
     descargarCSV("predigoles_grupos.csv",
-      ["ID","Nombre","Torneo","Admin","Celular","Correo","Estado pago","Creado"],
-      PC_grupos.map(g=>[g.grupoId,g.nombreGrupo,(TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId,g.nombreAdmin,g.celularAdmin,g.correoAdmin,g.estadoPago,fmtFechaCorta(g.fechaCreacion)]));
+      ["ID","Nombre","Torneo","Admin","Ciudad","Celular","Correo","Estado pago","Creado"],
+      PC_grupos.map(g=>[g.grupoId,g.nombreGrupo,(TOURNAMENTS[g.torneoId]||{}).nombre||g.torneoId,g.nombreAdmin,g.ciudadAdmin||"",g.celularAdmin,g.correoAdmin,g.estadoPago,fmtFechaCorta(g.fechaCreacion)]));
   };
   const btnExpCom=document.getElementById("pc_exportar_comentarios");
   if(btnExpCom)btnExpCom.onclick=()=>{
@@ -2526,7 +2530,7 @@ function renderPanelCentralMain(){
         const r=await edgeCall("admin-provisionar-grupo",{
           masterPin:PC_masterHash,grupoId:s.grupoId,nombreGrupo:s.nombreGrupo,torneoId:s.torneoId,
           modoSeguimiento:s.modoSeguimiento,equiposSeguidos:s.equiposSeguidos||[],
-          nombreAdmin:s.nombreAdmin,celularAdmin:s.celularAdmin,correoAdmin:s.correoAdmin,pin:s.pinDeseado||"",
+          nombreAdmin:s.nombreAdmin,celularAdmin:s.celularAdmin,correoAdmin:s.correoAdmin,ciudadAdmin:s.ciudadAdmin,pin:s.pinDeseado||"",
         });
         if(r&&r.status==="success"){
           // La solicitud ya cumplió su propósito -- se marca atendida sola,

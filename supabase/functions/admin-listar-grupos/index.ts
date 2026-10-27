@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: grupos, error } = await db
       .from("groups")
-      .select("id, name, admin_nombre, admin_celular, admin_correo, torneo_id, created_at, estado_pago")
+      .select("id, name, admin_nombre, admin_celular, admin_correo, admin_ciudad, torneo_id, created_at, estado_pago")
       .order("created_at", { ascending: false });
     if (error) return errOut("admin-listar-grupos", error);
 
@@ -35,6 +35,7 @@ Deno.serve(async (req: Request) => {
         nombreAdmin: g.admin_nombre,
         celularAdmin: g.admin_celular,
         correoAdmin: g.admin_correo,
+        ciudadAdmin: g.admin_ciudad,
         torneoId: g.torneo_id,
         fechaCreacion: g.created_at,
         estadoPago: g.estado_pago,

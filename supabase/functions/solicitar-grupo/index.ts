@@ -59,9 +59,11 @@ Deno.serve(async (req: Request) => {
     const nombreAdmin = limpiarTexto(body.nombreAdmin, 60);
     const celularAdmin = limpiarTexto(body.celularAdmin, 20);
     const correoAdmin = limpiarTexto(body.correoAdmin, 60);
+    const ciudadAdmin = limpiarTexto(body.ciudadAdmin, 60);
     if (!nombreAdmin) return jsonOut({ status: "error", message: "Falta el nombre del administrador." });
     if (!celularAdmin) return jsonOut({ status: "error", message: "Falta el celular del administrador." });
     if (!correoAdmin.includes("@")) return jsonOut({ status: "error", message: "Correo del administrador inválido." });
+    if (!ciudadAdmin) return jsonOut({ status: "error", message: "Falta la ciudad." });
 
     // Atrapa dominios sin correo configurado (inventados, con typo grave, etc.)
     // antes de guardar la solicitud -- así se evita el caso real de un correo
@@ -116,6 +118,7 @@ Deno.serve(async (req: Request) => {
       nombre_admin: nombreAdmin,
       celular_admin: celularAdmin,
       correo_admin: correoAdmin,
+      ciudad_admin: ciudadAdmin,
       pin_deseado: pinDeseado,
       metodo_pago: metodoPago,
     }).select("id").single();
