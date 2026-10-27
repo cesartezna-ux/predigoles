@@ -63,6 +63,29 @@ Deno.serve(async (req: Request) => {
     if (!celularAdmin) return jsonOut({ status: "error", message: "Falta el celular del administrador." });
     if (!correoAdmin.includes("@")) return jsonOut({ status: "error", message: "Correo del administrador inválido." });
 
+    // Atrapa dominios sin correo configurado (inventados, con typo grave, etc.)
+    // antes de guardar la solicitud -- así se evita el caso real de un correo
+    // que rebota porque el dominio ni siquiera puede recibir correos. Solo se
+    // bloquea cuando el DNS respondió y no hay NINGÚN registro MX; si el
+    // lookup mismo falla (timeout, resolver caído, dominio no resuelve en
+    // absoluto), se deja pasar -- nunca se bloquea a alguien por una falla
+    // transitoria de nuestro lado.
+    const dominioCorreo = correoAdmin.split("@")[1] || "";
+    if (dominioCorreo) {
+      try {
+        const mx = await Deno.resolveDns(dominioCorreo, "MX");
+        // Un registro "." (exchange) es un Null MX (RFC 7505) -- el dominio
+        // declaró explícitamente que no recibe correo. Cuenta igual que no
+        // tener ningún registro.
+        const recibeCorreo = mx.some((r) => r.exchange !== ".");
+        if (!recibeCorreo) {
+          return jsonOut({ status: "error", message: "Ese dominio de correo no puede recibir correos. Revisa que esté bien escrito." });
+        }
+      } catch (errDns) {
+        console.error("[solicitar-grupo] No se pudo verificar MX del dominio (se deja pasar):", dominioCorreo, String(errDns));
+      }
+    }
+
     let pinDeseado: string | null = limpiarTexto(body.pinDeseado, 4);
     if (pinDeseado && !/^\d{4}$/.test(pinDeseado)) {
       return jsonOut({ status: "error", message: "El PIN debe ser de 4 dígitos, o déjalo vacío." });

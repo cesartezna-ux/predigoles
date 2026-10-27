@@ -1562,6 +1562,7 @@ function renderSetup(){
       <input class="input" id="st_admin_cel" maxlength="20" placeholder="Ej: 3001234567">
       <label class="field" style="margin-top:10px">Tu correo</label>
       <input class="input" id="st_admin_correo" type="email" maxlength="60" placeholder="correo@ejemplo.com">
+      <div id="st_correo_sugerencia" style="display:none;font-size:12px;color:var(--muted);margin-top:4px">¿Quisiste decir <a href="#" id="st_correo_sugerencia_link" style="color:var(--mint)"></a>?</div>
       <label class="field" style="margin-top:10px">PIN que quieres usar (opcional — si lo dejas vacío, te asignamos uno)</label>
       <input class="input" id="st_pin" inputmode="numeric" maxlength="4" placeholder="••••" style="letter-spacing:.3em;font-size:20px;text-align:center">
       <div id="st_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
@@ -1579,6 +1580,43 @@ function renderSetup(){
   document.querySelectorAll('input[name="st_modo"]').forEach(r=>{
     r.onchange=()=>{document.getElementById("st_equipos").style.display=r.value==="equipo"&&r.checked?"block":"none";};
   });
+  // Sugerencia de typo de dominio (no bloquea, solo avisa) -- cubre el caso
+  // más común de correo que rebota: "gmial.com" en vez de "gmail.com". La
+  // validación real de que el dominio pueda recibir correo vive en el
+  // servidor (solicitar-grupo), esto es solo una ayuda visual.
+  const DOMINIOS_COMUNES=["gmail.com","hotmail.com","outlook.com","yahoo.com","icloud.com","live.com"];
+  function distanciaLevenshtein(a,b){
+    const m=a.length,n=b.length;
+    const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+    for(let j=0;j<=n;j++)d[0][j]=j;
+    for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){
+      d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);
+    }
+    return d[m][n];
+  }
+  const elCorreo=document.getElementById("st_admin_correo");
+  const elSugerencia=document.getElementById("st_correo_sugerencia");
+  const elSugerenciaLink=document.getElementById("st_correo_sugerencia_link");
+  elCorreo.onblur=()=>{
+    const v=elCorreo.value.trim();
+    const arroba=v.lastIndexOf("@");
+    if(arroba<0){elSugerencia.style.display="none";return;}
+    const dominio=v.slice(arroba+1).toLowerCase();
+    let mejor=null,mejorDist=99;
+    for(const d of DOMINIOS_COMUNES){
+      if(dominio===d)continue;
+      const dist=distanciaLevenshtein(dominio,d);
+      if(dist<mejorDist){mejorDist=dist;mejor=d;}
+    }
+    if(mejor&&mejorDist>0&&mejorDist<=2){
+      const corregido=v.slice(0,arroba+1)+mejor;
+      elSugerenciaLink.textContent=corregido;
+      elSugerenciaLink.onclick=(e)=>{e.preventDefault();elCorreo.value=corregido;elSugerencia.style.display="none";};
+      elSugerencia.style.display="block";
+    }else{
+      elSugerencia.style.display="none";
+    }
+  };
   async function enviarSolicitud(metodoPago,btn){
     const err=document.getElementById("st_err");
     const grupoId=document.getElementById("st_id").value.trim();
