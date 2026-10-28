@@ -2306,8 +2306,9 @@ let PC_masterHash=null;
 let PC_grupos=[];
 let PC_solicitudes=[];
 let PC_comentarios=[];
-let PC_tab="grupos"; // grupos | solicitudes | comentarios
+let PC_tab="grupos"; // grupos | solicitudes | comentarios | home
 let PC_comentariosVer="nuevos"; // nuevos | leidos
+let PC_destacado=null; // partido forzado en el demo de Home (ver admin-destacado-demo), o null si no hay ninguno activo
 
 // Exporta cualquier tabla simple a CSV -- se usa tal cual desde Excel/Sheets,
 // sin necesidad de una librería para generar .xlsx real. El BOM al inicio es
@@ -2353,6 +2354,8 @@ function bootPanelCentral(){
         PC_solicitudes=(rs&&rs.status==="success")?(rs.solicitudes||[]):[];
         const rc=await edgeCall("admin-listar-comentarios",{masterPin:hash});
         PC_comentarios=(rc&&rc.status==="success")?(rc.comentarios||[]):[];
+        const rd=await edgeCall("admin-destacado-demo",{masterPin:hash});
+        PC_destacado=(rd&&rd.status==="success")?rd.destacado:null;
         renderPanelCentralMain();
       }else{
         err.textContent=(r&&r.message)||"No se pudo conectar.";
@@ -2389,6 +2392,7 @@ function renderPanelCentralMain(){
     <div class="tab ${PC_tab==="grupos"?"active":""}" data-pctab="grupos">Grupos${totalGrupos?" ("+totalGrupos+")":""}</div>
     <div class="tab ${PC_tab==="solicitudes"?"active":""}" data-pctab="solicitudes">Solicitudes${PC_solicitudes.length?" ("+PC_solicitudes.length+")":""}</div>
     <div class="tab ${PC_tab==="comentarios"?"active":""}" data-pctab="comentarios">Comentarios${nuevosCount?" ("+nuevosCount+")":""}</div>
+    <div class="tab ${PC_tab==="home"?"active":""}" data-pctab="home">Partido Home</div>
   </div>`;
 
   const filas=PC_grupos.length?PC_grupos.map(g=>`
@@ -2473,7 +2477,24 @@ function renderPanelCentralMain(){
     </div>`:`<div class="empty" style="padding:30px 10px"><span class="big">💬</span>Nada por aquí todavía.</div>`}
   `;
 
-  const panesHtml=PC_tab==="grupos"?gruposPaneHtml:PC_tab==="solicitudes"?solicitudesPaneHtml:comentariosPaneHtml;
+  const destacadoPaneHtml=`
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">El demo público de Home elige solo el partido de mayor audiencia probable entre los que están en vivo. Acá puedes forzar uno puntual (ej. un clásico) mientras esté vigente — después de esa hora, vuelve a elegir solo.</p>
+    ${PC_destacado?`
+    <div class="row" style="border-color:rgba(255,200,69,.4)">
+      <div class="who">
+        <div class="nm">⭐ ${escapeHtml(PC_destacado.home)} vs ${escapeHtml(PC_destacado.away)}</div>
+        <div class="sub">Torneo: ${escapeHtml((TOURNAMENTS[PC_destacado.torneoId]||{}).nombre||PC_destacado.torneoId)}<br>Vigente hasta: ${fmtFechaCorta(PC_destacado.hasta)} ${FT.format(new Date(PC_destacado.hasta))}</div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="link-btn" id="pc_destacado_cambiar" style="color:var(--gold)">✏️ Cambiar</button>
+          <button class="link-btn" id="pc_destacado_quitar" style="color:var(--flare)">🗑️ Quitar</button>
+        </div>
+      </div>
+    </div>`:`
+    <div class="empty" style="padding:30px 10px"><span class="big">⭐</span>Ningún partido forzado ahora — el demo elige solo.</div>
+    <button class="btn" id="pc_destacado_elegir" style="margin-top:14px">⭐ Elegir partido destacado</button>`}
+  `;
+
+  const panesHtml=PC_tab==="grupos"?gruposPaneHtml:PC_tab==="solicitudes"?solicitudesPaneHtml:PC_tab==="comentarios"?comentariosPaneHtml:destacadoPaneHtml;
 
   pcCard(`
     <div class="brandlock" style="margin-bottom:2px"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
@@ -2598,6 +2619,87 @@ function renderPanelCentralMain(){
       else toast("No se pudo actualizar.",true,3000);
     };
   });
+  const btnDestElegir=document.getElementById("pc_destacado_elegir"),btnDestCambiar=document.getElementById("pc_destacado_cambiar");
+  if(btnDestElegir)btnDestElegir.onclick=showElegirDestacado;
+  if(btnDestCambiar)btnDestCambiar.onclick=showElegirDestacado;
+  const btnDestQuitar=document.getElementById("pc_destacado_quitar");
+  if(btnDestQuitar)btnDestQuitar.onclick=async()=>{
+    await conCargando(btnDestQuitar,async()=>{
+      const r=await edgeCall("admin-destacado-demo",{masterPin:PC_masterHash,accion:"quitar"});
+      if(r&&r.status==="success"){PC_destacado=null;renderPanelCentralMain();toast("Destacado retirado",false,2200);}
+      else toast((r&&r.message)||"No se pudo quitar.",true,3000);
+    },"Quitando...");
+  };
+}
+
+// Convierte un Date a texto "YYYY-MM-DDTHH:mm" en hora local, el formato
+// que espera <input type="datetime-local">.
+function aDatetimeLocal(d){
+  const pad=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function showElegirDestacado(){
+  const old=document.getElementById("ovl");if(old)old.remove();
+  const ov=document.createElement("div");ov.className="overlay";ov.id="ovl";
+  document.body.appendChild(ov);
+  const torneoIds=Object.keys(TOURNAMENTS);
+  const torneoOptions=torneoIds.map(id=>`<option value="${id}" ${id===TOURNAMENT_DEFAULT?"selected":""}>${escapeHtml(TOURNAMENTS[id].nombre)}</option>`).join("");
+  ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
+    <div class="kicker" style="color:var(--gold)">Panel Central</div>
+    <h2>Elegir partido destacado</h2>
+    <label class="field">Torneo</label>
+    <select class="select-popup" id="ed_torneo">${torneoOptions}</select>
+    <label class="field" style="margin-top:12px">Partido</label>
+    <select class="select-popup" id="ed_partido"><option value="">Cargando partidos…</option></select>
+    <label class="field" style="margin-top:12px">Vigente hasta</label>
+    <input class="input" id="ed_hasta" type="datetime-local">
+    <div id="ed_err" style="color:var(--flare);font-size:12px;min-height:18px;margin-top:8px;text-align:center"></div>
+    <button class="btn" id="ed_guardar" style="margin-top:10px">⭐ Dejarlo destacado</button>
+    <button class="btn ghost" id="ed_cancelar" style="margin-top:10px">Cancelar</button>
+  </div>`;
+  let partidos=[];
+  async function cargarPartidos(torneoId){
+    const sel=document.getElementById("ed_partido");
+    sel.innerHTML=`<option value="">Cargando partidos…</option>`;
+    const desdeIso=new Date(Date.now()-3*3600*1000).toISOString();
+    const rows=await restCall(`fixtures?torneo_id=eq.${encodeURIComponent(torneoId)}&kickoff=gt.${encodeURIComponent(desdeIso)}&select=match_id,home,away,kickoff&order=kickoff.asc&limit=60`);
+    partidos=rows||[];
+    if(!partidos.length){sel.innerHTML=`<option value="">No hay partidos próximos en este torneo</option>`;return;}
+    sel.innerHTML=partidos.map((p,i)=>`<option value="${i}">${escapeHtml(nombreCanonico(p.home))} vs ${escapeHtml(nombreCanonico(p.away))} · ${fmtFechaCorta(p.kickoff)} ${FT.format(new Date(p.kickoff))}</option>`).join("");
+    actualizarHasta();
+  }
+  function actualizarHasta(){
+    const i=document.getElementById("ed_partido").value;
+    if(i==="")return;
+    const kick=new Date(partidos[i].kickoff);
+    document.getElementById("ed_hasta").value=aDatetimeLocal(new Date(kick.getTime()+3*3600*1000));
+  }
+  document.getElementById("ed_torneo").onchange=e=>cargarPartidos(e.target.value);
+  document.getElementById("ed_partido").onchange=actualizarHasta;
+  cargarPartidos(document.getElementById("ed_torneo").value);
+  document.getElementById("ed_cancelar").onclick=()=>ov.remove();
+  document.getElementById("ed_guardar").onclick=async()=>{
+    const err=document.getElementById("ed_err");
+    const i=document.getElementById("ed_partido").value;
+    const hastaLocal=document.getElementById("ed_hasta").value;
+    if(i===""){err.textContent="Elige un partido.";return;}
+    if(!hastaLocal){err.textContent="Falta la fecha de vigencia.";return;}
+    const p=partidos[i];
+    const torneoId=document.getElementById("ed_torneo").value;
+    const hasta=new Date(hastaLocal).toISOString();
+    await conCargando(document.getElementById("ed_guardar"),async()=>{
+      const r=await edgeCall("admin-destacado-demo",{masterPin:PC_masterHash,accion:"guardar",torneoId,matchId:p.match_id,home:p.home,away:p.away,hasta});
+      if(r&&r.status==="success"){
+        PC_destacado=r.destacado;
+        ov.remove();
+        renderPanelCentralMain();
+        toast("Partido destacado ✓",false,2500);
+      }else{
+        err.textContent=(r&&r.message)||"No se pudo guardar.";
+      }
+    },"Guardando...");
+  };
 }
 
 // Confirmación reforzada (escribir el nombre exacto) porque esto borra el

@@ -54,19 +54,36 @@ const PRIO_EQUIPO_PUNTOS = 10;
 // Para "siguiente prueba": partidos que empiezan dentro de esta ventana compiten por prioridad.
 const VENTANA_SIGUIENTE_MS = 6 * 60 * 60 * 1000;
 
-// Partidos destacados a mano para un día concreto: ganan siempre sobre la regla
-// general. Se desactivan solos al cerrar la ventana (hasta), no hace falta quitarlos.
-const DESTACADOS = [
-  { torneoId: "nations_league_2026_27", equipos: ["croatia", "spain"], desde: "2026-10-06T05:00:00Z", hasta: "2026-10-07T05:00:00Z" },
-];
+// Partido destacado a mano desde Panel Central (tabla demo_destacados,
+// ver admin-destacado-demo): gana siempre sobre la regla general mientras
+// esté vigente. Reemplaza el arreglo hardcodeado que exigía editar este
+// archivo y redesplegar por cada partido puntual (ej. Croacia-España del
+// 6/10/2026). Se identifica por match_id -- no por nombres de equipo --
+// porque el admin lo elige de una lista real de fixtures, no a mano.
 const PUNTAJE_DESTACADO = 1000;
 
-export function puntajeAudiencia(torneoId: string, home: string, away: string): number {
-  const ahora = Date.now();
-  const nombres = sinTildes(`${home} ${away}`);
-  for (const d of DESTACADOS) {
-    if (d.torneoId === torneoId && d.equipos.every((e) => nombres.includes(e)) &&
-        ahora >= Date.parse(d.desde) && ahora < Date.parse(d.hasta)) return PUNTAJE_DESTACADO;
+export async function destacadoActivo(db: SupabaseClient): Promise<{ torneoId: string; matchId: string } | null> {
+  const nowIso = new Date().toISOString();
+  const { data } = await db
+    .from("demo_destacados")
+    .select("torneo_id, match_id")
+    .lte("desde", nowIso)
+    .gt("hasta", nowIso)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ? { torneoId: data.torneo_id, matchId: data.match_id } : null;
+}
+
+export function puntajeAudiencia(
+  torneoId: string,
+  home: string,
+  away: string,
+  destacado?: { torneoId: string; matchId: string } | null,
+  matchId?: string,
+): number {
+  if (destacado && destacado.torneoId === torneoId && matchId && destacado.matchId === matchId) {
+    return PUNTAJE_DESTACADO;
   }
   let s = PRIO_TORNEO[torneoId] ?? PRIO_TORNEO_DEFAULT;
   for (const equipo of [home, away]) {
@@ -120,13 +137,13 @@ export async function partidoDemo(db: SupabaseClient): Promise<PartidoDemo | nul
   if (candidatos.length === 0) return null;
 
   // Una sola consulta de nombres para todos los candidatos (este endpoint se consulta en polling).
-  const { data: fixtures } = await db
-    .from("fixtures")
-    .select("torneo_id, match_id, home, away")
-    .in("match_id", candidatos.map((f) => f.match_id));
+  const [{ data: fixtures }, destacado] = await Promise.all([
+    db.from("fixtures").select("torneo_id, match_id, home, away").in("match_id", candidatos.map((f) => f.match_id)),
+    destacadoActivo(db),
+  ]);
   const conNombres = candidatos.map((fila) => {
     const fx = (fixtures ?? []).find((f) => f.torneo_id === fila.torneo_id && f.match_id === fila.match_id);
-    return fx ? { fila, fx, puntaje: puntajeAudiencia(fila.torneo_id, fx.home, fx.away) } : null;
+    return fx ? { fila, fx, puntaje: puntajeAudiencia(fila.torneo_id, fx.home, fx.away, destacado, fila.match_id) } : null;
   });
   // Mayor audiencia probable primero; empate → el sincronizado más recientemente.
   const elegido = conNombres
@@ -153,18 +170,19 @@ export async function partidoDemo(db: SupabaseClient): Promise<PartidoDemo | nul
 export type SiguientePrueba = { torneoId: string; home: string; away: string; kickoff: string };
 export async function siguientePrueba(db: SupabaseClient): Promise<SiguientePrueba | null> {
   const ahora = Date.now();
-  const { data: filas } = await db
-    .from("fixtures")
-    .select("torneo_id, home, away, kickoff")
-    .gt("kickoff", new Date(ahora).toISOString())
-    .order("kickoff", { ascending: true })
-    .limit(200);
+  const [{ data: filas }, destacado] = await Promise.all([
+    db.from("fixtures").select("torneo_id, match_id, home, away, kickoff")
+      .gt("kickoff", new Date(ahora).toISOString())
+      .order("kickoff", { ascending: true })
+      .limit(200),
+    destacadoActivo(db),
+  ]);
   if (!filas || filas.length === 0) return null;
 
   const enVentana = filas.filter((f) => new Date(f.kickoff).getTime() <= ahora + VENTANA_SIGUIENTE_MS);
   const grupo = enVentana.length > 0 ? enVentana : [filas[0]];
   const elegido = grupo
-    .map((f) => ({ f, puntaje: puntajeAudiencia(f.torneo_id, f.home, f.away) }))
+    .map((f) => ({ f, puntaje: puntajeAudiencia(f.torneo_id, f.home, f.away, destacado, f.match_id) }))
     .sort((x, y) => y.puntaje - x.puntaje || new Date(x.f.kickoff).getTime() - new Date(y.f.kickoff).getTime())[0].f;
   return { torneoId: elegido.torneo_id, home: elegido.home, away: elegido.away, kickoff: elegido.kickoff };
 }
