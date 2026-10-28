@@ -27,6 +27,9 @@ Deno.serve(async (req: Request) => {
       .order("created_at", { ascending: true });
     if (error) return errOut("demo-ranking", error);
 
+    // Solo hay puntos reales cuando el partido ya terminó -- antes de
+    // empezar y en vivo, el resultado real todavía no existe.
+    const terminado = partido.empezado && !partido.enVivo;
     let entradas = (data ?? []).map((e) => {
       const pronostico = { h: e.home_score, a: e.away_score };
       return {
@@ -34,10 +37,10 @@ Deno.serve(async (req: Request) => {
         emoji: e.emoji,
         homeScore: e.home_score,
         awayScore: e.away_score,
-        puntos: partido.enVivo ? null : puntos(pronostico, { h: partido.homeScore, a: partido.awayScore }),
+        puntos: terminado ? puntos(pronostico, { h: partido.homeScore, a: partido.awayScore }) : null,
       };
     });
-    if (!partido.enVivo) entradas = entradas.sort((x, y) => (y.puntos ?? 0) - (x.puntos ?? 0));
+    if (terminado) entradas = entradas.sort((x, y) => (y.puntos ?? 0) - (x.puntos ?? 0));
 
     return jsonOut({
       status: "success",
@@ -50,6 +53,8 @@ Deno.serve(async (req: Request) => {
         awayScore: partido.awayScore,
         minute: partido.minute,
         enVivo: partido.enVivo,
+        empezado: partido.empezado,
+        kickoff: partido.kickoff,
       },
       proxima,
       entradas,

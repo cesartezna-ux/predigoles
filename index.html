@@ -1864,23 +1864,28 @@ async function pintarDemo(box,r){
   const cta=(texto)=>`<a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:14px">${texto}</a>`;
   if(!p){
     const prox=proximaPruebaHtml(r.proxima);
-    box.innerHTML=`<div style="color:var(--muted);font-size:13px">Ahora mismo no hay partido en vivo en el demo. Vuelve cuando empiece el siguiente.</div>${prox}`;
+    box.innerHTML=`<div style="color:var(--muted);font-size:13px">Ahora mismo no hay ningún partido activo en el demo. Vuelve más tarde.</div>${prox}`;
     return;
   }
+  const terminado=p.empezado&&!p.enVivo;
   const lista=(r.entradas||[]).length?r.entradas.map((e,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:9px 0;${i?"border-top:1px solid var(--faint)":""}">
       <span style="font-size:20px">${escapeHtml(e.emoji)}</span>
       <span style="font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(e.apodo)}</span>
       <span style="font-family:var(--score);font-size:20px;color:var(--gold)">${e.homeScore}–${e.awayScore}</span>
-      ${p.enVivo?"":`<span style="font-size:12px;color:var(--mint);font-weight:700;min-width:48px;text-align:right">+${e.puntos} pts</span>`}
+      ${terminado?`<span style="font-size:12px;color:var(--mint);font-weight:700;min-width:48px;text-align:right">+${e.puntos} pts</span>`:""}
     </div>`).join(""):'<div style="color:var(--muted);font-size:13px;padding:6px 0">Todavía nadie ha pronosticado este partido. ¡Sé el primero!</div>';
 
-  const cabecera=p.enVivo
-    ?`<div style="color:var(--flare);font-size:12px;font-weight:700;letter-spacing:.06em">🔴 EN VIVO ${p.minute!=null?p.minute+"'":""}</div>`
-    :'<div style="color:var(--mint);font-size:12px;font-weight:700;letter-spacing:.06em">PARTIDO TERMINADO · así quedó el demo 🏆</div>';
-  const marcador=`<div style="font-weight:700;margin-top:6px;font-size:16px">${escapeHtml(p.home)} <span style="font-family:var(--score);font-size:26px;color:var(--gold)">${p.homeScore}–${p.awayScore}</span> ${escapeHtml(p.away)}</div>`;
+  const cabecera=!p.empezado
+    ?'<div style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.06em">🎮 PRÓXIMAMENTE · pronostica antes del pitazo</div>'
+    :p.enVivo
+      ?`<div style="color:var(--flare);font-size:12px;font-weight:700;letter-spacing:.06em">🔴 EN VIVO ${p.minute!=null?p.minute+"'":""}</div>`
+      :'<div style="color:var(--mint);font-size:12px;font-weight:700;letter-spacing:.06em">PARTIDO TERMINADO · así quedó el demo 🏆</div>';
+  const marcador=p.empezado
+    ?`<div style="font-weight:700;margin-top:6px;font-size:16px">${escapeHtml(p.home)} <span style="font-family:var(--score);font-size:26px;color:var(--gold)">${p.homeScore}–${p.awayScore}</span> ${escapeHtml(p.away)}</div>`
+    :`<div style="font-weight:700;margin-top:6px;font-size:16px">${escapeHtml(p.home)} <span style="color:var(--muted);font-size:14px;font-weight:400">vs</span> ${escapeHtml(p.away)}</div>${p.kickoff?`<div style="color:var(--muted);font-size:12.5px;margin-top:4px">🗓️ Arranca: ${fmtFechaCorta(p.kickoff)} · ${FT.format(new Date(p.kickoff))}</div>`:""}`;
 
-  if(!p.enVivo){
+  if(terminado){
     const prox=proximaPruebaHtml(r.proxima);
     box.innerHTML=`${cabecera}${marcador}<div style="margin-top:12px">${lista}</div>
       <div style="color:var(--muted);font-size:12.5px;margin-top:12px">Así se gana en Predigoles: +1 por acertar el ganador o el empate, +2 extra por marcador exacto.</div>
@@ -1898,8 +1903,11 @@ async function pintarDemo(box,r){
 
   const emojis=DEMO_EMOJIS.map((em,i)=>`<button type="button" class="demo-emoji" data-emoji="${em}" style="font-size:22px;background:${i?"var(--panel2)":"var(--raise)"};border:1px solid var(--faint);border-radius:12px;width:48px;height:48px;cursor:pointer">${em}</button>`).join("");
   const opcionesMarcador=Array.from({length:10},(_,n)=>`<option value="${n}">${n}</option>`).join("");
+  const avisoDemo=p.empezado
+    ?"🎮 Demo: aquí puedes pronosticar un partido que ya empezó. En la app real, los pronósticos cierran 1 minuto antes del inicio."
+    :"🎮 Demo: este partido aún no empieza — pronostica ya mismo, igual que en la app real (los pronósticos cierran 1 minuto antes del pitazo).";
   box.innerHTML=`${cabecera}${marcador}
-    <div style="background:rgba(255,200,69,.08);border:1px solid rgba(255,200,69,.3);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px">🎮 Demo: aquí puedes pronosticar un partido que ya empezó. En la app real, los pronósticos cierran 1 minuto antes del inicio.</div>
+    <div style="background:rgba(255,200,69,.08);border:1px solid rgba(255,200,69,.3);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px">${avisoDemo}</div>
     <label class="field" style="margin-top:12px">Tu apodo</label>
     <input class="input" id="demo_apodo" maxlength="20" placeholder="Hincha26">
     <div style="color:var(--muted);font-size:11.5px;margin-top:6px">Usa un apodo, no tu apellido. Tu apodo se verá públicamente en esta página. No pedimos correo ni teléfono.</div>

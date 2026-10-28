@@ -39,8 +39,13 @@ Deno.serve(async (req: Request) => {
     if (!/^[a-zA-Z0-9-]{8,64}$/.test(navegadorId)) return jsonOut({ status: "error", message: "Recarga la página e intenta de nuevo." });
 
     const partido = await partidoDemo(db);
-    if (!partido || !partido.enVivo) {
-      return jsonOut({ status: "error", message: "Ahora mismo no hay partido en vivo en el demo. Vuelve cuando empiece el siguiente." });
+    if (!partido) {
+      return jsonOut({ status: "error", message: "Ahora mismo no hay ningún partido activo en el demo. Vuelve más tarde." });
+    }
+    // Se puede pronosticar antes del pitazo inicial (igual que en la app
+    // real) y mientras está en vivo -- solo se cierra cuando ya terminó.
+    if (partido.empezado && !partido.enVivo) {
+      return jsonOut({ status: "error", message: "Este partido del demo ya terminó. Vuelve cuando empiece el siguiente." });
     }
 
     const { count } = await db

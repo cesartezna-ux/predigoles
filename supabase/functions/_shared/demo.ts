@@ -56,12 +56,11 @@ const VENTANA_SIGUIENTE_MS = 6 * 60 * 60 * 1000;
 
 // Partido destacado a mano desde Panel Central (tabla demo_destacados,
 // ver admin-destacado-demo): gana siempre sobre la regla general mientras
-// esté vigente. Reemplaza el arreglo hardcodeado que exigía editar este
-// archivo y redesplegar por cada partido puntual (ej. Croacia-España del
-// 6/10/2026). Se identifica por match_id -- no por nombres de equipo --
-// porque el admin lo elige de una lista real de fixtures, no a mano.
-const PUNTAJE_DESTACADO = 1000;
-
+// esté vigente -- en vivo, antes de empezar, o recién terminado. Reemplaza
+// el arreglo hardcodeado que exigía editar este archivo y redesplegar por
+// cada partido puntual (ej. Croacia-España del 6/10/2026). Se identifica
+// por match_id -- no por nombres de equipo -- porque el admin lo elige de
+// una lista real de fixtures, no a mano.
 export async function destacadoActivo(db: SupabaseClient): Promise<{ torneoId: string; matchId: string } | null> {
   const nowIso = new Date().toISOString();
   const { data } = await db
@@ -75,16 +74,7 @@ export async function destacadoActivo(db: SupabaseClient): Promise<{ torneoId: s
   return data ? { torneoId: data.torneo_id, matchId: data.match_id } : null;
 }
 
-export function puntajeAudiencia(
-  torneoId: string,
-  home: string,
-  away: string,
-  destacado?: { torneoId: string; matchId: string } | null,
-  matchId?: string,
-): number {
-  if (destacado && destacado.torneoId === torneoId && matchId && destacado.matchId === matchId) {
-    return PUNTAJE_DESTACADO;
-  }
+export function puntajeAudiencia(torneoId: string, home: string, away: string): number {
   let s = PRIO_TORNEO[torneoId] ?? PRIO_TORNEO_DEFAULT;
   for (const equipo of [home, away]) {
     const n = sinTildes(equipo);
@@ -103,16 +93,62 @@ export type PartidoDemo = {
   minute: number | null;
   status: string | null;
   enVivo: boolean;
+  // false solo para el destacado manual elegido antes de su pitazo inicial
+  // (sin fila en fixture_results todavía) -- se puede pronosticar igual,
+  // como en la app real, que cierra pronósticos 1 minuto antes del inicio.
+  empezado: boolean;
+  kickoff: string | null;
 };
 
-// Partido para el demo: el de mayor audiencia probable entre los que están en
-// vivo (sync reciente); si no hay ninguno, entre los que terminaron hace poco
-// (para revelar el ranking).
+// Partido para el demo: primero el destacado manual si está vigente (ver
+// destacadoActivo); si no hay ninguno (o ya tuvo su momento y quedó muy
+// atrás), el de mayor audiencia probable entre los que están en vivo
+// (sync reciente), o si no hay ninguno, entre los que terminaron hace
+// poco (para revelar el ranking).
 export async function partidoDemo(db: SupabaseClient): Promise<PartidoDemo | null> {
   const ahora = Date.now();
   const ventanaVivo = new Date(ahora - VENTANA_EN_VIVO_MS).toISOString();
   const ventanaRanking = new Date(ahora - VENTANA_RANKING_MS).toISOString();
   const columnas = "torneo_id, match_id, home_score, away_score, status, minute, synced_at";
+
+  const destacado = await destacadoActivo(db);
+  if (destacado) {
+    const { data: resultado } = await db
+      .from("fixture_results")
+      .select(columnas)
+      .eq("torneo_id", destacado.torneoId)
+      .eq("match_id", destacado.matchId)
+      .maybeSingle();
+    const vivo = !!resultado && resultado.status !== null && resultado.synced_at >= ventanaVivo;
+    const terminadoReciente = !!resultado && resultado.status === null && resultado.synced_at >= ventanaRanking;
+
+    if (vivo || terminadoReciente) {
+      const { data: fx } = await db.from("fixtures").select("home, away, kickoff")
+        .eq("torneo_id", destacado.torneoId).eq("match_id", destacado.matchId).maybeSingle();
+      if (fx) {
+        return {
+          torneoId: destacado.torneoId, matchId: destacado.matchId, home: fx.home, away: fx.away,
+          homeScore: Number(resultado!.home_score ?? 0), awayScore: Number(resultado!.away_score ?? 0),
+          minute: resultado!.minute ?? null, status: resultado!.status ?? null, enVivo: vivo, empezado: true,
+          kickoff: fx.kickoff,
+        };
+      }
+    } else if (!resultado) {
+      // Nunca se ha sincronizado -- todavía no empieza. Se puede pronosticar
+      // de una vez, igual que en la app real antes del pitazo inicial.
+      const { data: fx } = await db.from("fixtures").select("home, away, kickoff")
+        .eq("torneo_id", destacado.torneoId).eq("match_id", destacado.matchId).maybeSingle();
+      if (fx) {
+        return {
+          torneoId: destacado.torneoId, matchId: destacado.matchId, home: fx.home, away: fx.away,
+          homeScore: 0, awayScore: 0, minute: null, status: null, enVivo: false, empezado: false,
+          kickoff: fx.kickoff,
+        };
+      }
+    }
+    // Si llegó aquí: el destacado ya tuvo su momento y quedó muy atrás
+    // (terminó hace más de VENTANA_RANKING_MS) -- sigue el flujo normal.
+  }
 
   const { data: vivos } = await db
     .from("fixture_results")
@@ -137,13 +173,13 @@ export async function partidoDemo(db: SupabaseClient): Promise<PartidoDemo | nul
   if (candidatos.length === 0) return null;
 
   // Una sola consulta de nombres para todos los candidatos (este endpoint se consulta en polling).
-  const [{ data: fixtures }, destacado] = await Promise.all([
-    db.from("fixtures").select("torneo_id, match_id, home, away").in("match_id", candidatos.map((f) => f.match_id)),
-    destacadoActivo(db),
-  ]);
+  const { data: fixtures } = await db
+    .from("fixtures")
+    .select("torneo_id, match_id, home, away")
+    .in("match_id", candidatos.map((f) => f.match_id));
   const conNombres = candidatos.map((fila) => {
     const fx = (fixtures ?? []).find((f) => f.torneo_id === fila.torneo_id && f.match_id === fila.match_id);
-    return fx ? { fila, fx, puntaje: puntajeAudiencia(fila.torneo_id, fx.home, fx.away, destacado, fila.match_id) } : null;
+    return fx ? { fila, fx, puntaje: puntajeAudiencia(fila.torneo_id, fx.home, fx.away) } : null;
   });
   // Mayor audiencia probable primero; empate → el sincronizado más recientemente.
   const elegido = conNombres
@@ -162,27 +198,43 @@ export async function partidoDemo(db: SupabaseClient): Promise<PartidoDemo | nul
     minute: fila.minute ?? null,
     status: fila.status ?? null,
     enVivo,
+    empezado: true,
+    kickoff: null,
   };
 }
 
-// Siguiente prueba: entre los partidos que empiezan en la ventana, el de mayor
-// audiencia probable; si no hay ninguno, el que empieza primero.
+// Siguiente prueba: si hay un destacado activo (ver admin-destacado-demo),
+// gana siempre y de inmediato -- sin esperar a que entre en la ventana de
+// las próximas horas, porque el punto de elegirlo con anticipación es
+// justo poder anunciarlo antes de que esté inminente. Si no hay ninguno,
+// entre los partidos que empiezan en la ventana, el de mayor audiencia
+// probable; si no hay ninguno en la ventana, el que empieza primero.
 export type SiguientePrueba = { torneoId: string; home: string; away: string; kickoff: string };
 export async function siguientePrueba(db: SupabaseClient): Promise<SiguientePrueba | null> {
+  const destacado = await destacadoActivo(db);
+  if (destacado) {
+    const { data: fx } = await db
+      .from("fixtures")
+      .select("torneo_id, home, away, kickoff")
+      .eq("torneo_id", destacado.torneoId)
+      .eq("match_id", destacado.matchId)
+      .maybeSingle();
+    if (fx) return { torneoId: fx.torneo_id, home: fx.home, away: fx.away, kickoff: fx.kickoff };
+  }
+
   const ahora = Date.now();
-  const [{ data: filas }, destacado] = await Promise.all([
-    db.from("fixtures").select("torneo_id, match_id, home, away, kickoff")
-      .gt("kickoff", new Date(ahora).toISOString())
-      .order("kickoff", { ascending: true })
-      .limit(200),
-    destacadoActivo(db),
-  ]);
+  const { data: filas } = await db
+    .from("fixtures")
+    .select("torneo_id, home, away, kickoff")
+    .gt("kickoff", new Date(ahora).toISOString())
+    .order("kickoff", { ascending: true })
+    .limit(200);
   if (!filas || filas.length === 0) return null;
 
   const enVentana = filas.filter((f) => new Date(f.kickoff).getTime() <= ahora + VENTANA_SIGUIENTE_MS);
   const grupo = enVentana.length > 0 ? enVentana : [filas[0]];
   const elegido = grupo
-    .map((f) => ({ f, puntaje: puntajeAudiencia(f.torneo_id, f.home, f.away, destacado, f.match_id) }))
+    .map((f) => ({ f, puntaje: puntajeAudiencia(f.torneo_id, f.home, f.away) }))
     .sort((x, y) => y.puntaje - x.puntaje || new Date(x.f.kickoff).getTime() - new Date(y.f.kickoff).getTime())[0].f;
   return { torneoId: elegido.torneo_id, home: elegido.home, away: elegido.away, kickoff: elegido.kickoff };
 }
