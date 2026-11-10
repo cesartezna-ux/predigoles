@@ -17,8 +17,8 @@ fbq('track', 'PageView');
 src="https://www.facebook.com/tr?id=4601108483445142&ev=PageView&noscript=1"
 /></noscript>
 <!-- End Meta Pixel Code -->
-<title>Predigoles — La quiniela de tu grupo</title>
-<meta name="description" content="Pronósticos, resultados en tiempo real y ranking automático para la quiniela de tu oficina, familia o amigos. Sin Excel, sin sumar puntos a mano.">
+<title>Predigoles — Pronósticos de fútbol para tu grupo</title>
+<meta name="description" content="Pronósticos, resultados en tiempo real y ranking automático para tu oficina, familia o amigos. Sin Excel, sin sumar puntos a mano.">
 <link rel="canonical" href="https://www.predigoles.com/">
 
 <!-- Open Graph / Twitter Card -- sin esto, compartir el link por WhatsApp
@@ -26,16 +26,16 @@ src="https://www.facebook.com/tr?id=4601108483445142&ev=PageView&noscript=1"
      og-image.jpg vive en la raíz del repo (diseño propio, 1200x630). -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Predigoles">
-<meta property="og:title" content="Predigoles — La quiniela de tu grupo, lista en minutos">
-<meta property="og:description" content="Pronósticos, resultados en tiempo real y ranking automático para la quiniela de tu oficina, familia o amigos.">
+<meta property="og:title" content="Predigoles — Pronósticos de fútbol para tu grupo, listos en minutos">
+<meta property="og:description" content="Pronósticos, resultados en tiempo real y ranking automático para tu oficina, familia o amigos.">
 <meta property="og:image" content="https://www.predigoles.com/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://www.predigoles.com/">
 <meta property="og:locale" content="es_CO">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Predigoles — La quiniela de tu grupo, lista en minutos">
-<meta name="twitter:description" content="Pronósticos, resultados en tiempo real y ranking automático para la quiniela de tu oficina, familia o amigos.">
+<meta name="twitter:title" content="Predigoles — Pronósticos de fútbol para tu grupo, listos en minutos">
+<meta name="twitter:description" content="Pronósticos, resultados en tiempo real y ranking automático para tu oficina, familia o amigos.">
 <meta name="twitter:image" content="https://www.predigoles.com/og-image.jpg">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1164,7 +1164,7 @@ function renderRanking(c){
   const{board,finished,total}=buildBoard();
   const pot=computePot();
   const premioHtml=pot.total>0?`<div class="rules" style="margin-bottom:14px;border-color:rgba(255,200,69,.35)">
-    <div><b>🏆 Bote total: <span style="color:var(--gold)">${fmtCOP(pot.total)}</span></b> <span style="color:var(--muted);font-size:12px">(${pot.jugadores} jugador${pot.jugadores===1?"":"es"} inscrito${pot.jugadores===1?"":"s"})</span></div>
+    <div><b>🏆 Total del grupo: <span style="color:var(--gold)">${fmtCOP(pot.total)}</span></b> <span style="color:var(--muted);font-size:12px">(${pot.jugadores} jugador${pot.jugadores===1?"":"es"})</span></div>
     <div style="margin-top:8px">🥇 <b style="color:var(--gold)">${fmtCOP(pot.p1)}</b> &nbsp; 🥈 <b style="color:var(--line)">${fmtCOP(pot.p2)}</b> &nbsp; 🥉 <b style="color:var(--line)">${fmtCOP(pot.p3)}</b></div>
   </div>`:"";
   if(board.length===0){c.innerHTML=premioHtml+`<div class="empty"><span class="big">🏟️</span>Todavía nadie se ha unido.</div>`;return;}
@@ -1190,7 +1190,7 @@ async function showGroupEdit(){
   ov.innerHTML=`<div class="card">
     <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
     <h2>Editar grupo</h2>
-    <label class="field">Nombre del grupo/polla</label>
+    <label class="field">Nombre del grupo</label>
     <input class="input" id="ge_name" maxlength="30" value="${escapeHtml(S.groupName||"")}">
     <p style="color:var(--muted);font-size:12px;margin:12px 0 6px">Deja el PIN en blanco si no quieres cambiarlo.</p>
     <label class="field">Nuevo PIN de administrador (opcional)</label>
@@ -1297,9 +1297,9 @@ function showBettingConfig(){
   const premios=b.premios||{};
   ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
     <div class="kicker" style="color:var(--gold)">Modo Organizador</div>
-    <h2>Premios e inscripción</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto define lo que ve TODO el grupo (monto total y reparto). Cada uno le transfiere directo al ganador según este reparto — la app no recauda ni mueve dinero.</p>
-    <label class="field">Monto de inscripción por jugador (COP)</label>
+    <h2>Reparto del grupo</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esto es un acuerdo informal entre ustedes: define lo que ve TODO el grupo (monto total y reparto). Cada uno le transfiere directo al ganador — Predigoles no recauda ni mueve dinero, solo lo muestra.</p>
+    <label class="field">Monto que pone cada jugador (COP)</label>
     <input class="input" id="bc_insc" type="number" min="0" step="1000" value="${b.inscripcion||0}">
     <p style="color:var(--muted);font-size:12px;margin:14px 0 6px">Reparto entre los primeros 3 puestos (%):</p>
     <label class="field">🥇 1er puesto</label>
@@ -1320,7 +1320,7 @@ function showBettingConfig(){
     const total=insc*jugadores;
     const pv=document.getElementById("bc_preview");
     const sumaPremios=p1+p2+p3;
-    pv.innerHTML=`Con <b style="color:var(--line)">${jugadores}</b> jugador(es) registrados: bote total <b style="color:var(--gold)">${fmtCOP(total)}</b><br>
+    pv.innerHTML=`Con <b style="color:var(--line)">${jugadores}</b> jugador(es) registrados: total del grupo <b style="color:var(--gold)">${fmtCOP(total)}</b><br>
       🥇 ${fmtCOP(total*p1/100)} · 🥈 ${fmtCOP(total*p2/100)} · 🥉 ${fmtCOP(total*p3/100)}
       ${sumaPremios!==100?`<br><span style="color:var(--flare)">⚠️ Los porcentajes suman ${sumaPremios}%, no 100%.</span>`:""}`;
   }
@@ -1339,7 +1339,7 @@ function showBettingConfig(){
       const r=await edgeCall("guardar-premios",{pin:S.organizerPinHash,inscripcion:insc,premios:{p1,p2,p3}});
       if(!r||r.status!=="success")return;
       ov.remove();
-      toast("Premios actualizados ✓",false,3000);
+      toast("Reparto actualizado ✓",false,3000);
       if(S.view==="ranking")renderRanking(document.getElementById("content"));
     },"Guardando...");
   };
@@ -1381,7 +1381,7 @@ function renderResultados(c){
       </button>
       <button class="orgrow" id="rs_premios">
         <div class="orgico" style="background:rgba(255,200,69,.15);color:var(--gold)">🏆</div>
-        <div class="lbl">Premio del grupo</div>
+        <div class="lbl">Reparto del grupo</div>
         <div class="chev">›</div>
       </button>
     </div>
@@ -1451,7 +1451,7 @@ function showComoUsar(){
     <div class="orglist">
       <div style="padding:14px"><b style="color:var(--line)">✏️ Nombre y PIN del grupo</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Cambia el nombre que ven los jugadores, o tu propio PIN de administrador.</div></div>
       <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">⚽ Qué equipo(s) seguir</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Sigue el torneo completo, o filtra a solo los partidos de uno o varios equipos.</div></div>
-      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">🏆 Premio del grupo</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Define cómo se reparte el premio (1°, 2°, 3° puesto) — Predigoles nunca recauda ni mueve dinero, solo lo muestra.</div></div>
+      <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">🏆 Reparto del grupo</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Define cómo se reparten ese dinero entre ustedes (1°, 2°, 3° puesto) — Predigoles nunca recauda ni mueve dinero, solo lo muestra.</div></div>
       <div style="padding:14px;border-top:1px solid var(--faint)"><b style="color:var(--line)">🔑 Restablecer PIN de un jugador</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Si un jugador olvida su PIN, lo reseteas aquí y se lo entregas tú mismo.</div></div>
     </div>
 
@@ -1539,13 +1539,13 @@ function renderSetup(){
   }
   root.innerHTML=`
     <div class="brandlock"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
-    <h1>Activa <span class="yr">tu quiniela</span></h1>
+    <h1>Activa <span class="yr">tu grupo</span></h1>
     <p class="sub">Cuéntanos cómo quieres tu grupo para activarlo.</p>
     <div class="card" style="max-width:100%;margin-top:20px">
       <label class="field">ID del grupo (para el link — solo letras, números, guiones)</label>
       <input class="input" id="st_id" maxlength="40" placeholder="ej: mioficina2026">
       <label class="field" style="margin-top:12px">Nombre del grupo</label>
-      <input class="input" id="st_nombre" maxlength="60" placeholder="Ej: Quiniela Oficina">
+      <input class="input" id="st_nombre" maxlength="60" placeholder="Ej: Pronósticos Oficina">
       <label class="field" style="margin-top:12px">Torneo</label>
       <select class="select-popup" id="st_torneo">${torneoOptions}</select>
       <label class="field">¿Qué va a seguir este grupo?</label>
@@ -1721,12 +1721,12 @@ function renderLanding(){
   root.innerHTML=`
     <div class="topfijo">
       <div class="brandlock lg"><img src="/marca/logo-simbolo.png" alt=""><span class="word">PREDI<b>GOLES</b></span></div>
-      <h1>La <span class="yr">quiniela</span> de tu grupo, lista en minutos</h1>
+      <h1><span class="yr">Pronósticos</span> de tu grupo, listos en minutos</h1>
       <p class="sub">Fútbol, resultados en tiempo real y ranking automático — para tu oficina, tu familia o tus amigos. Sin Excel, sin sumar puntos a mano.</p>
 
       <div id="landing_live"></div>
 
-      <a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mi quiniela</a>
+      <a class="btn" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')" style="text-decoration:none;text-align:center;display:block;margin-top:18px">🚀 Quiero mis pronósticos</a>
       <div style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px">$30.000 COP por todo el grupo · menos de $3.000 por persona si son 10</div>
     </div>
 
@@ -1980,8 +1980,8 @@ function showGrupoNoEncontrado(){
     <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Los grupos de Predigoles se crean solo desde el administrador central — este identificador (<b style="color:var(--line)">${escapeHtml(TAB)}</b>) todavía no ha sido provisionado.</p>
     <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Si crees que esto es un error, contacta a quien te compartió el link.</p>
     <div class="addbox" style="margin:0">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿No tienes aún creada tu quiniela?</div>
-      <a class="smallbtn full" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')">🚀 Cómprala aquí</a>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">¿No tienes aún creado tu grupo?</div>
+      <a class="smallbtn full" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/setup" target="_blank" rel="noopener" onclick="fbq('track','InitiateCheckout')">🚀 Créalo aquí</a>
     </div>
   </div>`;
 }
@@ -2011,7 +2011,7 @@ async function showOnboarding(isChange){
   function renderSelectScreen(){
     pendingIco=AVATARS[0];
     ov.innerHTML=`<div class="card" style="max-height:90vh;overflow-y:auto">
-      <div class="kicker" style="color:var(--mint)">Bienvenido a la polla de ${escapeHtml((TOURNAMENTS[S.torneoId]||TOURNAMENTS[TOURNAMENT_DEFAULT]).nombre)}</div>
+      <div class="kicker" style="color:var(--mint)">Bienvenido al grupo de ${escapeHtml((TOURNAMENTS[S.torneoId]||TOURNAMENTS[TOURNAMENT_DEFAULT]).nombre)}</div>
       <h2>¿Quién juega?</h2>
       ${roster.length>0?`
         <input class="input" id="search_in" placeholder="🔍 Buscar jugador..." style="margin-bottom:10px">
@@ -2768,7 +2768,7 @@ function showCrearGrupo(){
     <label class="field">ID del grupo (para el link — solo letras, números, guiones)</label>
     <input class="input" id="cg_id" maxlength="40" placeholder="ej: cliente-oficina1">
     <label class="field" style="margin-top:12px">Nombre del grupo</label>
-    <input class="input" id="cg_nombre" maxlength="30" placeholder="Ej: Polla Oficina Cliente X">
+    <input class="input" id="cg_nombre" maxlength="30" placeholder="Ej: Grupo Oficina Cliente X">
     <label class="field" style="margin-top:12px">Torneo</label>
     <select class="select-popup" id="cg_torneo">${torneoOptions}</select>
     <label class="field">¿Qué va a seguir este grupo?</label>

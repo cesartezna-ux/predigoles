@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
         amount_type: "CLOSE",
         amount: { currency: "COP", total_amount: amountCop },
         reference,
-        description: "Quiniela Predigoles",
+        description: "Grupo de pronósticos Predigoles",
         callback_url: callbackUrl,
         payment_methods: ["CREDIT_CARD"],
       }),
